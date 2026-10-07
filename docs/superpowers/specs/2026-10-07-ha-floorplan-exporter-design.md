@@ -342,10 +342,11 @@ scripts/export.sh house.ha-floorplan.json
 scripts/export.sh job.json --home other.sh3d --output /tmp/out
 ```
 
-Whether the photo renderers work under `-Djava.awt.headless=true` is unknown;
-the GPU renderer's build notes say Java 3D needs a display even to build
-scenes. `scripts/export.sh` first tries headless; if Java 3D needs a display,
-it runs with the current `DISPLAY` and the README says so.
+The export needs a display even though it opens no window: Java 3D, which
+every renderer uses to build the scene, does not load under
+`-Djava.awt.headless=true` (§9). `scripts/export.sh` therefore runs with the
+current `DISPLAY`; on a machine without one, `xvfb-run scripts/export.sh …`
+works.
 
 ## 5. Instructions file format
 
@@ -530,24 +531,30 @@ reopen. Save an instructions file from the dialog, run it with
 `scripts/export.sh`, and compare the output with the dialog's own export.
 Load a file saved from a different home and check the warning.
 
-## 9. Open points to settle during implementation
+## 9. Open points, as settled during implementation
 
-1. Confirm on rendered output that `Level.setVisible(false)` hides a level in
-   all three renderers (the source of each tests `isViewableAndVisible()`,
-   §4.2). If one does not, the fallback is to remove the other levels' items
-   from the clone for the duration of that floor's jobs.
-2. Exact `Camera.setTime` time-zone convention (§4.2, verification defined).
-3. Whether rendering works with `java.awt.headless=true` (§4.4, fallback
-   defined).
-4. Whether a `LOW`-quality SunFlow night render is fully dark with all lights
-   off, or has ambient light; the overlay maths does not depend on it, but the
-   default `noiseThreshold` may need tuning from sample output.
-5. How dark the Blender renderer's lights-off night render is and how much
-   denoising residue differs between two renders of the same scene; this
-   decides whether the default `noiseThreshold` of 6 also suits Cycles.
-6. Whether a floor opening can be built programmatically in
-   `SampleHomeFactory` (§8). If not, the isolation assertion compares against
-   a sample whose upper room simply has no floor over part of the lower one.
+1. **Level hiding.** `Level.setVisible(false)` hides a level in SunFlow and in
+   the Blender renderer (checked on the sample home: the ground floor shows
+   beside the first floor, and disappears with `isolateLevel`). YafaRay is not
+   installed on the development machine; its source tests the same flag.
+2. **Camera time.** `Camera.time` holds the local wall-clock time as if it
+   were UTC; renderers convert it with `Camera.convertTimeToTimeZone` and the
+   compass time zone. The exporter builds it with
+   `LocalDateTime.toInstant(ZoneOffset.UTC)`.
+3. **Headless.** Not possible: Java 3D classes throw `HeadlessException` when
+   loaded with `java.awt.headless=true`, for every renderer. `export.sh` needs
+   a display (`xvfb-run` is enough); `HeadlessExport` says so instead of
+   printing a stack trace.
+4. **SunFlow at night.** SunFlow adds a default light under the ceiling of
+   every room whose ceiling is visible. With "Hide ceilings" on, the exported
+   floor has none and its night base is black. With it off, that default
+   light is in the base images and in the night base alike, so overlays are
+   unaffected.
+5. **Blender at night.** The lights-off night render stays under 12/255 (a
+   faint sky glow) and two renders of the same scene differ by a handful of
+   pixels. The default `noiseThreshold` of 6 suits both renderers.
+6. **Sample home.** No floor opening is needed: the sample's first floor
+   covers half of the ground floor, which shows beside it from above.
 
 ## 10. Suggested build order
 

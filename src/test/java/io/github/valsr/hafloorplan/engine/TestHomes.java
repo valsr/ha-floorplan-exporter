@@ -18,20 +18,24 @@ import com.eteks.sweethome3d.model.Room;
  * Homes built in code for tests.
  */
 public final class TestHomes {
+    private static final int WHITE_LIGHT_COLOR = 0xBBBBBB;
+
     private static CatalogLight catalogLight;
 
     private TestHomes() {
     }
 
     /**
-     * Returns a new light of the default catalog.
+     * Returns a new white light of the default catalog.
      */
     public static HomeLight light(String name, float power) {
         if (catalogLight == null) {
             for (FurnitureCategory category : new DefaultFurnitureCatalog().getCategories()) {
                 for (CatalogPieceOfFurniture piece : category.getFurniture()) {
+                    // The catalog also has colored lights
                     if (catalogLight == null && piece instanceof CatalogLight
-                            && ((CatalogLight)piece).getLightSources().length > 0) {
+                            && ((CatalogLight)piece).getLightSources().length > 0
+                            && ((CatalogLight)piece).getLightSources() [0].getColor() == WHITE_LIGHT_COLOR) {
                         catalogLight = (CatalogLight)piece;
                     }
                 }

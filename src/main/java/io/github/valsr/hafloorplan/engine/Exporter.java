@@ -4,12 +4,14 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 
 import javax.imageio.ImageIO;
 
@@ -45,6 +47,21 @@ public final class Exporter {
         this.config = config;
         this.backend = backend;
         this.generator = generator;
+    }
+
+    /**
+     * Returns the name and version of this program, as written in manifests.
+     */
+    public static String generatorName() {
+        Properties descriptor = new Properties();
+        try (InputStream in = Exporter.class.getResourceAsStream("/ApplicationPlugin.properties")) {
+            if (in != null) {
+                descriptor.load(in);
+            }
+        } catch (IOException ex) {
+            // Version unknown
+        }
+        return "ha-floorplan-exporter " + descriptor.getProperty("version", "unknown");
     }
 
     /**
