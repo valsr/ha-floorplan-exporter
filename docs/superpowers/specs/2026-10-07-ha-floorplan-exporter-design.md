@@ -1,8 +1,8 @@
 # HA Floorplan Exporter — Design
 
 Date: 2026-10-07
-Status: amended 2026-10-07 (level isolation, JSON instructions file); amendment
-awaiting review, implementation not started
+Status: approved, amended 2026-10-07 (level isolation, JSON instructions file,
+Blender GPU renderer); implementation not started
 
 ## 1. Purpose
 
@@ -48,7 +48,8 @@ pixel-for-pixel.
 | Viewpoint | One stored camera per floor, chosen by the user from the home's stored viewpoints, or "current 3D view". |
 | Light output | Difference overlay per light against an all-lights-off base. The base is the "off" state. |
 | Combination | Base = floor × date × time. Overlays = one per light, on the light's own floor, rendered at night. |
-| Renderer | User chooses among `AbstractPhotoRenderer.getAvailableRenderers()` (SunFlow, YafaRay) and quality `LOW` or `HIGH`. |
+| Renderer | User chooses among `AbstractPhotoRenderer.getAvailableRenderers()` and quality `LOW` or `HIGH`. That list is SunFlow and YafaRay, plus our own "Blender Cycles (GPU)" renderer (`/work/sh3d/gpu-renderer`) when its Java agent is loaded. The exporter has no compile-time or packaging dependency on it. |
+| Renderer reuse | One renderer instance per scene state, not per job: all of a floor's lights-off renders share one instance, each light render gets its own (§4.2). |
 | Level isolation | One global switch, `isolateLevel`, default off. Off: a floor is rendered with the levels below it. On: only that floor's level is rendered. |
 | Instructions | One JSON format (§5) for the CLI input, the file saved and loaded by the dialog, and the dialog state stored in the home. No `.properties` config. |
 | Home path | The instructions file may name its `.sh3d`; a home given on the command line overrides it. |
@@ -65,6 +66,27 @@ pixel-for-pixel.
     `j3dutils.jar`, `vecmath.jar`, native `.so`).
   - YafaRay natives in `/usr/lib/sweethome3d/yafaray/`.
   - User plugins in `~/.eteks/sweethome3d/plugins/`.
+- **Blender GPU renderer** (`sh3d.gpurenderer.BlenderRenderer`, sibling
+  project `/work/sh3d/gpu-renderer`, jar `build/gpu-renderer.jar`, installed
+  location `/usr/lib/sweethome3d/gpu-renderer/gpu-renderer.jar`):
+  - It registers itself through `-javaagent:gpu-renderer.jar`, which appends
+    its class to the system property
+    `com.eteks.sweethome3d.j3d.rendererClassNames` and puts the jar on the
+    class path. Inside Sweet Home 3D the user's launcher already does this, so
+    the plugin sees the renderer with no extra work. The CLI launcher must add
+    the agent itself (§4.4).
+  - It needs Blender ≥ 4.0 on `PATH` (or `-Dsh3d.gpurenderer.blender=…`) and
+    reports `isAvailable() == false` otherwise.
+  - It exports the home once and keeps a Blender process loaded until
+    `dispose()`; a later `render` call with a different camera or camera time
+    reuses the loaded scene. Creating a new instance per render would restart
+    Blender and re-export the home every time.
+  - Quality maps to Cycles samples (`LOW` 64, `HIGH` 256). It requires a JVM
+    17 or later, which does not constrain our own `--release 8` classes.
+- Renderers are identified by **class name**; the display name comes from
+  `getName()`. `AbstractPhotoRenderer.createInstance` silently falls back to
+  SunFlow for a class it cannot load, so availability must be checked
+  explicitly (§4.2).
 - JDK 26 is installed. `javac --release 8` still works (with an "obsolete"
   warning); compile with `--release 8 -Xlint:-options` so the plugin loads on
   any JVM that Sweet Home 3D 7.5 supports. Therefore: **no Java language
@@ -94,12 +116,12 @@ Dependencies point one way: `plugin` → `engine` → `plan`, `cli` → `engine`
 
 | Type | Responsibility |
 |---|---|
-| `ExportConfig` | Immutable, fully resolved value: floors (level id + camera id, or "current view"), date schedule, time schedule, light ids, width, height, renderer name, quality, hide-ceilings flag, isolate-level flag, noise threshold, output dir. |
+| `ExportConfig` | Immutable, fully resolved value: floors (level id + camera id, or "current view"), date schedule, time schedule, light ids, width, height, renderer class name, quality, hide-ceilings flag, isolate-level flag, noise threshold, output dir. |
 | `DateSchedule` | start date, end date, interval in days → ordered list of `LocalDate`, both ends inclusive. |
 | `TimeSchedule` | start time, end time, interval in minutes → ordered list of `LocalTime`, both ends inclusive. |
 | `RenderJob` | One render: floor id, kind (`BASE`, `NIGHT_BASE`, `LIGHT`), date + time (for `BASE`), light id (for `LIGHT`), relative output path. |
 | `ExportPlanner` | `plan(ExportConfig, HomeSummary) → List<RenderJob>` in execution order. |
-| `HomeSummary` | Plain data about the home: floors (id, name, elevation index), lights (id, name, floor id) and stored cameras (id, name). Built by the engine from a `Home`; built by hand in tests. |
+| `HomeSummary` | Plain data the resolver and planner need: floors (id, name, elevation index), lights (id, name, floor id), stored cameras (id, name) and available renderers (class name, display name). Built by the engine from a `Home` and a `RenderBackend`; built by hand in tests. |
 | `Slugs` | Name → filesystem-safe slug, with numeric suffixes for collisions (`lamp`, `lamp-2`). |
 | `Json` | Minimal JSON reader and writer. Reads into `Map` / `List` / `String` / `Double` / `Boolean` / `null`; parse errors carry line and column. |
 | `Instructions` | Immutable value mirroring the instructions file (§5): the same settings as `ExportConfig`, but floors, cameras and lights are still unresolved references, and with the optional home path. |
@@ -127,8 +149,9 @@ are skipped and listed in the manifest's `skippedLights`.
 |---|---|
 | `HomeInspector` | `Home` → `HomeSummary`. Collects levels and all `HomeLight`s, recursing into `HomeFurnitureGroup`s. Homes without levels are treated as one floor with id `default`. |
 | `SceneConfigurer` | Mutates the **cloned** home for a job: visible floor, ceilings, light powers, camera. |
-| `RenderBackend` | Interface: `BufferedImage render(Home, Camera, int width, int height)`, plus `stop()`. Lets tests substitute a fake renderer. |
-| `Sh3dRenderBackend` | Real implementation using `AbstractPhotoRenderer.createInstance(name, home, null, quality)`, `render(image, camera, null)`, `dispose()`. |
+| `RenderBackend` | Interface: `List<RendererInfo> availableRenderers()` (class name + display name) and `RenderSession open(Home, rendererClassName, quality)`. Lets tests substitute a fake renderer. |
+| `RenderSession` | One renderer instance bound to one scene state: `BufferedImage render(Camera, int width, int height)`, `stop()`, `close()`. The home must not be mutated while a session is open, apart from the camera passed to `render`. |
+| `Sh3dRenderBackend` | Real implementation: `AbstractPhotoRenderer.createInstance(className, home, null, quality)`, `render(image, camera, null)`, and `dispose()` on close. |
 | `OverlayDiff` | Pure image function: `(nightBase, lit, threshold) → ARGB overlay`. |
 | `Exporter` | Orchestrates: clone home, iterate jobs, write PNGs, write manifest, report progress, honour cancellation. |
 | `ExportListener` | `jobStarted(index, total, job)`, `jobFinished(...)`; `Exporter.cancel()` is thread-safe. |
@@ -136,17 +159,19 @@ are skipped and listed in the manifest's `skippedLights`.
 **Cloning.** `Exporter` calls `home.clone()` once and only ever touches the
 clone. Original light powers are read from the clone before they are zeroed.
 
-**Floor visibility.** For a floor F on the clone: `setSelectedLevel(F)` and
-`getEnvironment().setAllLevelsVisible(false)`, which shows F and the levels
-below it. Implementation must confirm that the photo renderers honour this; if
-they do not, fall back to `Level.setViewable(false)` on every level above F.
+**Floor visibility.** Sweet Home 3D does not hide levels inside the
+renderers; `LevelController` sets the transient `Level.setVisible` flag and
+all three renderers test `Level.isViewableAndVisible()`. The exporter does the
+same on the clone. For a floor F, walking `home.getLevels()` in order: levels
+up to and including F get `setVisible(true)`, the ones after it
+`setVisible(false)`. `Level.setViewable` is never changed, so a level the user
+marked as not viewable stays hidden. `setSelectedLevel(F)` is also called so
+anything reading the selection agrees.
 
-**Level isolation.** When `isolateLevel` is true, additionally call
-`Level.setViewable(false)` on every level of the clone other than F, so that
-nothing below F is rendered either (no lower floor seen through a stairwell,
-no furniture or light from below). Each level's original viewable state is
-recorded when the home is cloned and restored before the next floor is set
-up. Consequences, all intended:
+**Level isolation.** When `isolateLevel` is true, F gets `setVisible(true)`
+and every other level `setVisible(false)`, so that nothing below F is rendered
+either (no lower floor seen through a stairwell, no furniture or light from
+below). Consequences, all intended:
 
 - "Other levels" means every other `Level` object, including one that shares
   F's elevation.
@@ -177,9 +202,28 @@ date of the schedule. If `Compass.getSunElevation(time) ≥ 0` there (polar
 summer), step through that day in 1-hour increments and use the time with the
 lowest elevation; record `nightSunElevation` in the manifest.
 
-**Renderer lifetime.** A photo renderer snapshots the scene when constructed,
-so a new renderer instance is created (and disposed) for every job. Image
-type is `BufferedImage.TYPE_INT_ARGB`; base images are written as opaque PNG.
+**Renderer selection.** The config's renderer is validated before any render:
+its class must be in `getAvailableRenderers()`, `createInstance` must return
+an instance of exactly that class (not the SunFlow fallback), and that
+instance's `isAvailable()` must be true. Otherwise the export fails up front
+with a message naming the renderer (for the Blender renderer: "is the
+gpu-renderer agent loaded and Blender installed?").
+
+**Renderer lifetime.** A renderer loads the scene at its first render and
+then only follows the camera, including the camera's time (all three
+recompute the sun from it on every render). Updating light sources through
+`render`'s `updatedItems` argument is not reliable across renderers (SunFlow
+re-exports the lamp's model but not its light sources), so a changed light
+means a new instance. Per floor the exporter therefore opens:
+
+1. one `RenderSession` with every light off, used for all `BASE` jobs and the
+   `NIGHT_BASE` job, then closed;
+2. one `RenderSession` per `LIGHT` job, opened after that light's power is
+   set, closed after its single render.
+
+With the Blender renderer this means one Blender start and one scene export
+for all of a floor's base images, and one per light. Image type is
+`BufferedImage.TYPE_INT_ARGB`; base images are written as opaque PNG.
 
 **Overlay maths.** For each pixel, base `B` and lit `L` per channel (0–255):
 
@@ -199,10 +243,12 @@ it is an approximation; this is an accepted trade-off.
 - Config problems (unknown floor, camera or light id; unavailable renderer;
   unwritable output dir) are detected before any render starts and reported as
   one `ExportException` listing all problems.
+- Sessions are closed in a `finally`, so a failed or cancelled export never
+  leaves a Blender process or its temporary folder behind.
 - A failure during a render aborts the export; files already written are
   kept; no manifest is written, so a missing manifest marks an incomplete
   export.
-- Cancel calls `RenderBackend.stop()`, stops after the current job, same
+- Cancel calls `RenderSession.stop()` on the open session, stops after the current job, same
   outcome as a failure but reported as cancelled.
 - Existing files in the output dir are overwritten. The dialog warns if the
   directory is not empty.
@@ -219,7 +265,10 @@ it is an approximation; this is an accepted trade-off.
     "Current 3D view").
   - Dates: start, end, interval (days). Times: start, end, interval (minutes).
   - Lights: checklist grouped by floor, with **All** and **None** buttons.
-  - Width, height, renderer combo, quality (Low / High), "Hide ceilings"
+  - Renderer combo listing `RenderBackend.availableRenderers()` by display
+    name (so "Blender Cycles (GPU)" appears whenever Sweet Home 3D was started
+    with the agent); a renderer whose `isAvailable()` is false is left out.
+  - Width, height, quality (Low / High), "Hide ceilings"
     (default on), "Hide other levels" (default off; disabled for a home
     without levels).
   - Output folder chooser.
@@ -275,14 +324,28 @@ Exit codes: 0 success, 1 export failure, 2 bad arguments or instructions.
 `scripts/export.sh` wraps this for real use: it sets the classpath, the Java
 3D library path and the `--add-opens` flag, then passes its arguments through.
 
+It also loads the Blender GPU renderer when it can find it. `scripts/env.sh`
+sets `SH3D_GPU_RENDERER_JAR` to the first of these that exists, unless the
+variable is already set (set it empty to disable):
+
+1. `/usr/lib/sweethome3d/gpu-renderer/gpu-renderer.jar` (installed),
+2. `../gpu-renderer/build/gpu-renderer.jar` relative to this repo (sibling
+   checkout).
+
+If a jar is found and `JAVA_TOOL_OPTIONS` does not already name a
+`gpu-renderer.jar` agent, `export.sh` adds `-javaagent:<jar>`. Without the jar
+only SunFlow and YafaRay are available, and instructions asking for the
+Blender renderer fail with the message from §4.2.
+
 ```
 scripts/export.sh house.ha-floorplan.json
 scripts/export.sh job.json --home other.sh3d --output /tmp/out
 ```
 
-Whether the photo renderers work under `-Djava.awt.headless=true` is unknown.
-`scripts/export.sh` first tries headless; if Java 3D needs a display, it runs
-with the current `DISPLAY` and the README says so.
+Whether the photo renderers work under `-Djava.awt.headless=true` is unknown;
+the GPU renderer's build notes say Java 3D needs a display even to build
+scenes. `scripts/export.sh` first tries headless; if Java 3D needs a display,
+it runs with the current `DISPLAY` and the README says so.
 
 ## 5. Instructions file format
 
@@ -305,7 +368,7 @@ One JSON object. The dialog writes it, the CLI and the dialog read it.
   "lights": "*",
   "width": 1920,
   "height": 1080,
-  "renderer": "SunFlow",
+  "renderer": "sh3d.gpurenderer.BlenderRenderer",
   "quality": "LOW",
   "hideCeilings": true,
   "isolateLevel": false,
@@ -323,7 +386,7 @@ One JSON object. The dialog writes it, the CLI and the dialog read it.
 | `times` | yes | | `start`, `end` as `HH:mm`, `intervalMinutes` ≥ 1. |
 | `lights` | no | `"*"` | Array of references, or `"*"` for all lights. `[]` for none. |
 | `width`, `height` | no | 1920, 1080 | Pixels. |
-| `renderer` | no | first available | A name from `getAvailableRenderers()`. |
+| `renderer` | no | first available | Matched, ignoring case, against each available renderer's class name, simple class name and display name: `"sh3d.gpurenderer.BlenderRenderer"`, `"BlenderRenderer"` and `"Blender Cycles (GPU)"` are the same renderer. The dialog writes the full class name. |
 | `quality` | no | `"LOW"` | `"LOW"` or `"HIGH"`. |
 | `hideCeilings` | no | `true` | |
 | `isolateLevel` | no | `false` | Render each floor with every other level hidden (§4.2). |
@@ -360,7 +423,8 @@ errors, so a misspelt key is reported rather than silently ignored.
 {
   "generator": "ha-floorplan-exporter 0.1.0",
   "width": 1920, "height": 1080,
-  "renderer": "SunFlow", "quality": "LOW",
+  "renderer": "sh3d.gpurenderer.BlenderRenderer",
+  "rendererName": "Blender Cycles (GPU)", "quality": "LOW",
   "hideCeilings": true, "isolateLevel": false,
   "dates": ["2026-01-01", "2026-01-31"],
   "times": ["00:00", "04:00"],
@@ -422,7 +486,8 @@ are not bundled.
   malformed input reports line and column.
 - `InstructionsJson`: round trip, defaults, `*` wildcards, both reference
   forms, missing required keys, unknown keys, wrong types, bad `version`.
-- `InstructionsResolver`: id match, name match, id-then-name fallback,
+- `InstructionsResolver`: renderer matched by class name, simple name and
+  display name; id match, name match, id-then-name fallback,
   ambiguous name, unknown reference, all problems reported together;
   `toInstructions` followed by `resolve` returns the original config.
 - `ManifestWriter`: output parses as JSON and matches the plan (string
@@ -434,8 +499,10 @@ are not bundled.
   written to the planned paths, light powers set as specified per job,
   original home unchanged, cancellation leaves no manifest. With
   `isolateLevel` on, the home handed to the backend for each job has only
-  that job's level viewable; with it off, every level keeps its original
-  viewable state.
+  that job's level visible; with it off, that level and the ones before it.
+  Session use: one session per floor for all `BASE` + `NIGHT_BASE` jobs, one
+  per `LIGHT` job, every session closed, also after a failure or a cancel. An
+  unavailable renderer fails before any session is opened.
 
 **End-to-end** (`scripts/export-sample.sh`): `SampleHomeFactory` (test source)
 builds a two-level home with one room per level, walls, a stored top-down
@@ -453,6 +520,10 @@ asserts:
   image that differs from the first run's, and a lower-floor one that does
   not (the lower floor has nothing below it).
 
+`export-sample.sh` uses SunFlow by default so it runs anywhere;
+`RENDERER=BlenderRenderer scripts/export-sample.sh` runs the same assertions
+through the GPU renderer and is part of the acceptance run on this machine.
+
 **Manual** (`scripts/run.sh`): open a real home, run the dialog, check
 All/None, the render count, cancel, and that settings persist after save and
 reopen. Save an instructions file from the dialog, run it with
@@ -461,18 +532,20 @@ Load a file saved from a different home and check the warning.
 
 ## 9. Open points to settle during implementation
 
-1. Whether `setAllLevelsVisible(false)` + selected level is honoured by both
-   photo renderers (§4.2, fallback defined), and whether both honour
-   `Level.setViewable(false)`, which level isolation relies on. If a renderer
-   ignores it, the fallback is to remove the other levels' items from the
-   clone for the duration of that floor's jobs.
+1. Confirm on rendered output that `Level.setVisible(false)` hides a level in
+   all three renderers (the source of each tests `isViewableAndVisible()`,
+   §4.2). If one does not, the fallback is to remove the other levels' items
+   from the clone for the duration of that floor's jobs.
 2. Exact `Camera.setTime` time-zone convention (§4.2, verification defined).
 3. Whether rendering works with `java.awt.headless=true` (§4.4, fallback
    defined).
 4. Whether a `LOW`-quality SunFlow night render is fully dark with all lights
    off, or has ambient light; the overlay maths does not depend on it, but the
    default `noiseThreshold` may need tuning from sample output.
-5. Whether a floor opening can be built programmatically in
+5. How dark the Blender renderer's lights-off night render is and how much
+   denoising residue differs between two renders of the same scene; this
+   decides whether the default `noiseThreshold` of 6 also suits Cycles.
+6. Whether a floor opening can be built programmatically in
    `SampleHomeFactory` (§8). If not, the isolation assertion compares against
    a sample whose upper room simply has no floor over part of the lower one.
 
