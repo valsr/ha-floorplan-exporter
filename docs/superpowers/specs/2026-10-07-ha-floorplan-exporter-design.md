@@ -1,7 +1,8 @@
 # HA Floorplan Exporter — Design
 
 Date: 2026-10-07
-Status: approved design, implementation not started
+Status: amended 2026-10-07 (level isolation, JSON instructions file); amendment
+awaiting review, implementation not started
 
 ## 1. Purpose
 
@@ -22,8 +23,13 @@ pixel-for-pixel.
 
 - From the Tools menu the user can select floors, a date range, a time range
   and lights (with All / None), and get the output folder described in §6.
+- The user can choose to render each floor on its own, with every other level
+  hidden.
+- The dialog can save its settings as a JSON instructions file (§5) and load
+  one back.
+- The same export can be run from the command line with nothing but that
+  instructions file, and produces the same output as the dialog.
 - The open home document is never modified by an export.
-- The same export can be run headlessly from a script against a `.sh3d` file.
 - `scripts/test.sh` and `scripts/export-sample.sh` pass on a machine with a JDK
   and Sweet Home 3D 7.5 installed.
 
@@ -43,6 +49,9 @@ pixel-for-pixel.
 | Light output | Difference overlay per light against an all-lights-off base. The base is the "off" state. |
 | Combination | Base = floor × date × time. Overlays = one per light, on the light's own floor, rendered at night. |
 | Renderer | User chooses among `AbstractPhotoRenderer.getAvailableRenderers()` (SunFlow, YafaRay) and quality `LOW` or `HIGH`. |
+| Level isolation | One global switch, `isolateLevel`, default off. Off: a floor is rendered with the levels below it. On: only that floor's level is rendered. |
+| Instructions | One JSON format (§5) for the CLI input, the file saved and loaded by the dialog, and the dialog state stored in the home. No `.properties` config. |
+| Home path | The instructions file may name its `.sh3d`; a home given on the command line overrides it. |
 | Structure | UI-free engine with two front ends: plugin dialog and headless CLI. |
 | Build | Plain shell scripts over `javac` and `jar`. No Maven or Gradle. |
 | Repo | Public GitHub repo `valsr/ha-floorplan-exporter`, licence GPL-2.0-or-later. Created during implementation. |
@@ -61,8 +70,9 @@ pixel-for-pixel.
   any JVM that Sweet Home 3D 7.5 supports. Therefore: **no Java language
   features newer than Java 8** in `src/main` (no `var`, records, text blocks,
   `List.of`).
-- No third-party runtime dependencies. JSON is written by a small hand-rolled
-  writer; config files are Java `.properties`.
+- No third-party runtime dependencies. JSON is read and written by a small
+  hand-rolled `Json` class (§4.1); it serves both the instructions file and
+  the manifest.
 - Sweet Home 3D on JDK 17+ needs
   `--add-opens=java.desktop/sun.awt=ALL-UNNAMED` (the system launcher adds it;
   our headless script must add it too).
@@ -84,15 +94,18 @@ Dependencies point one way: `plugin` → `engine` → `plan`, `cli` → `engine`
 
 | Type | Responsibility |
 |---|---|
-| `ExportConfig` | Immutable value: floors (level id + camera ref), date schedule, time schedule, light ids, width, height, renderer name, quality, hide-ceilings flag, noise threshold, output dir. |
+| `ExportConfig` | Immutable, fully resolved value: floors (level id + camera id, or "current view"), date schedule, time schedule, light ids, width, height, renderer name, quality, hide-ceilings flag, isolate-level flag, noise threshold, output dir. |
 | `DateSchedule` | start date, end date, interval in days → ordered list of `LocalDate`, both ends inclusive. |
 | `TimeSchedule` | start time, end time, interval in minutes → ordered list of `LocalTime`, both ends inclusive. |
 | `RenderJob` | One render: floor id, kind (`BASE`, `NIGHT_BASE`, `LIGHT`), date + time (for `BASE`), light id (for `LIGHT`), relative output path. |
 | `ExportPlanner` | `plan(ExportConfig, HomeSummary) → List<RenderJob>` in execution order. |
-| `HomeSummary` | Plain data the planner needs about the home: floors (id, name, elevation index) and lights (id, name, floor id). Built by the engine from a `Home`; built by hand in tests. |
+| `HomeSummary` | Plain data about the home: floors (id, name, elevation index), lights (id, name, floor id) and stored cameras (id, name). Built by the engine from a `Home`; built by hand in tests. |
 | `Slugs` | Name → filesystem-safe slug, with numeric suffixes for collisions (`lamp`, `lamp-2`). |
-| `ConfigProperties` | `ExportConfig` ⇄ `java.util.Properties` (used by the CLI and for saving dialog state). |
-| `ManifestWriter` | Writes `manifest.json` from the config, summary and job list. |
+| `Json` | Minimal JSON reader and writer. Reads into `Map` / `List` / `String` / `Double` / `Boolean` / `null`; parse errors carry line and column. |
+| `Instructions` | Immutable value mirroring the instructions file (§5): the same settings as `ExportConfig`, but floors, cameras and lights are still unresolved references, and with the optional home path. |
+| `InstructionsJson` | `Instructions` ⇄ JSON text. Applies defaults, rejects unknown keys and wrong types. |
+| `InstructionsResolver` | `resolve(Instructions, HomeSummary)` → `ExportConfig` plus a list of problems (unknown or ambiguous references). `toInstructions(ExportConfig, HomeSummary)` for the reverse direction, writing both id and name. |
+| `ManifestWriter` | Writes `manifest.json` from the config, summary and job list, using `Json`. |
 
 Schedule rules:
 
@@ -126,8 +139,23 @@ clone. Original light powers are read from the clone before they are zeroed.
 **Floor visibility.** For a floor F on the clone: `setSelectedLevel(F)` and
 `getEnvironment().setAllLevelsVisible(false)`, which shows F and the levels
 below it. Implementation must confirm that the photo renderers honour this; if
-they do not, fall back to `Level.setViewable(false)` on every level above F
-(restoring it between floors).
+they do not, fall back to `Level.setViewable(false)` on every level above F.
+
+**Level isolation.** When `isolateLevel` is true, additionally call
+`Level.setViewable(false)` on every level of the clone other than F, so that
+nothing below F is rendered either (no lower floor seen through a stairwell,
+no furniture or light from below). Each level's original viewable state is
+recorded when the home is cloned and restored before the next floor is set
+up. Consequences, all intended:
+
+- "Other levels" means every other `Level` object, including one that shares
+  F's elevation.
+- With the levels below hidden, whatever F has no room floor over (a
+  stairwell, a void) shows the ground or sky instead of the floor below.
+- The switch applies to all job kinds of the floor (`BASE`, `NIGHT_BASE`,
+  `LIGHT`), so overlays still align with and difference correctly against
+  their night base.
+- Homes without levels ignore the switch.
 
 **Ceilings.** When `hideCeilings` is true, `Room.setCeilingVisible(false)` on
 every room of floor F.
@@ -192,18 +220,34 @@ it is an approximation; this is an accepted trade-off.
   - Dates: start, end, interval (days). Times: start, end, interval (minutes).
   - Lights: checklist grouped by floor, with **All** and **None** buttons.
   - Width, height, renderer combo, quality (Low / High), "Hide ceilings"
-    (default on).
+    (default on), "Hide other levels" (default off; disabled for a home
+    without levels).
   - Output folder chooser.
+  - **Save instructions…** and **Load instructions…** buttons (below).
   - Live summary: "N base renders + M light renders".
   - Validation errors shown inline; Export disabled while invalid.
 - `ExportProgressDialog`: progress bar, current job label, Cancel. The export
   runs on a background thread (`SwingWorker`); completion, failure and
   cancellation each show a message.
+- **Save instructions…** writes the current settings as an instructions file
+  (§5) through a file chooser (default name `<home name>.ha-floorplan.json`).
+  It is enabled under the same condition as Export, so a saved file is always
+  runnable. Floors, cameras and lights are written with both id and name;
+  `home` is the absolute path of the open home, omitted if the home has never
+  been saved; `output` is absolute. A floor using "Current 3D view" is written
+  without a `camera`. If the home is unsaved or has unsaved changes, the
+  confirmation message says that the command line reads the home from disk, so
+  the home must be saved first for the two to match.
+- **Load instructions…** reads an instructions file and replaces the dialog's
+  settings. References that do not resolve in the open home (the file may come
+  from another home) are dropped and listed in one warning; a file that fails
+  to parse changes nothing and shows the parse error. The file's `home` field
+  is ignored.
 - Dialog state is saved to the real home as one property,
-  `haFloorplanExporter.config` (the `ConfigProperties` text), via
-  `Home.setProperty`, and restored on next open. This is the only write to the
-  open home; it marks the home modified, which is intended so the settings are
-  saved with the file.
+  `haFloorplanExporter.instructions` (the same JSON, without `home`), via
+  `Home.setProperty`, and restored on next open with the same leniency as
+  Load. This is the only write to the open home; it marks the home modified,
+  which is intended so the settings are saved with the file.
 - User-visible strings live in a `ResourceBundle` (English only for now).
 
 ### 4.4 `cli`
@@ -211,41 +255,93 @@ it is an approximation; this is an accepted trade-off.
 `HeadlessExport` main:
 
 ```
-HeadlessExport <home.sh3d> <config.properties> [--output <dir>]
+HeadlessExport <instructions.json | -> [--home <home.sh3d>] [--output <dir>]
 ```
 
-Loads the home with `HomeFileRecorder.readHome`, parses the config, runs
-`Exporter`, prints one line per job, exits 0 on success, 1 on export failure,
-2 on bad arguments or config. In the config file, floors, cameras and lights
-may be referenced by **name** as well as id, since ids are not visible to a
-user; an ambiguous name is a config error. The special values `floors=*`
-and `lights=*` select all.
+- The instructions come from the named file, or from standard input when the
+  argument is `-`.
+- The home is `--home` if given, otherwise the file's `home` field; having
+  neither is an argument error. `--output` likewise overrides `output`.
+- Relative `home` and `output` paths inside the file resolve against the
+  file's directory (the working directory when reading standard input).
+  Paths given on the command line resolve against the working directory.
+
+It loads the home with `HomeFileRecorder.readHome`, resolves the instructions
+against it, runs `Exporter` and prints one line per job. Unlike the dialog's
+Load, resolution here is strict: every unknown or ambiguous reference is an
+error, and all of them are reported together before anything is rendered.
+Exit codes: 0 success, 1 export failure, 2 bad arguments or instructions.
+
+`scripts/export.sh` wraps this for real use: it sets the classpath, the Java
+3D library path and the `--add-opens` flag, then passes its arguments through.
+
+```
+scripts/export.sh house.ha-floorplan.json
+scripts/export.sh job.json --home other.sh3d --output /tmp/out
+```
 
 Whether the photo renderers work under `-Djava.awt.headless=true` is unknown.
-`scripts/export-sample.sh` first tries headless; if Java 3D needs a display,
-the script runs with the current `DISPLAY` and the README says so.
+`scripts/export.sh` first tries headless; if Java 3D needs a display, it runs
+with the current `DISPLAY` and the README says so.
 
-## 5. Config file format
+## 5. Instructions file format
 
-```properties
-floors=Ground floor,First floor
-camera.Ground\ floor=Top ground
-camera.First\ floor=Top first
-dates.start=2026-01-01
-dates.end=2026-12-31
-dates.intervalDays=30
-times.start=00:00
-times.end=23:00
-times.intervalMinutes=240
-lights=*
-width=1920
-height=1080
-renderer=SunFlow
-quality=LOW
-hideCeilings=true
-noiseThreshold=6
-output=/path/to/out
+One JSON object. The dialog writes it, the CLI and the dialog read it.
+
+```json
+{
+  "version": 1,
+  "home": "house.sh3d",
+  "output": "out",
+  "floors": [
+    {
+      "level": {"id": "level-…", "name": "Ground floor"},
+      "camera": {"id": "camera-…", "name": "Top ground"}
+    },
+    {"level": "First floor", "camera": "Top first"}
+  ],
+  "dates": {"start": "2026-01-01", "end": "2026-12-31", "intervalDays": 30},
+  "times": {"start": "00:00", "end": "23:00", "intervalMinutes": 240},
+  "lights": "*",
+  "width": 1920,
+  "height": 1080,
+  "renderer": "SunFlow",
+  "quality": "LOW",
+  "hideCeilings": true,
+  "isolateLevel": false,
+  "noiseThreshold": 6
+}
 ```
+
+| Key | Required | Default | Notes |
+|---|---|---|---|
+| `version` | yes | | Must be `1`. |
+| `home` | no | | Path of the `.sh3d`. See §4.4 for precedence and relative paths. |
+| `output` | unless `--output` | | Output directory. |
+| `floors` | yes | | Array of `{level, camera}`, or `"*"` for every floor with the home's current view. A missing `camera` means the current view (the camera saved in the home file). |
+| `dates` | yes | | `start`, `end` as `YYYY-MM-DD`, `intervalDays` ≥ 1. |
+| `times` | yes | | `start`, `end` as `HH:mm`, `intervalMinutes` ≥ 1. |
+| `lights` | no | `"*"` | Array of references, or `"*"` for all lights. `[]` for none. |
+| `width`, `height` | no | 1920, 1080 | Pixels. |
+| `renderer` | no | first available | A name from `getAvailableRenderers()`. |
+| `quality` | no | `"LOW"` | `"LOW"` or `"HIGH"`. |
+| `hideCeilings` | no | `true` | |
+| `isolateLevel` | no | `false` | Render each floor with every other level hidden (§4.2). |
+| `noiseThreshold` | no | `6` | 0–255, see overlay maths. |
+
+**References.** A level, camera or light is given either as a string or as
+`{"id": …, "name": …}` (either member optional, at least one present).
+
+- A string matches an object's id, and failing that its name. This is the
+  form for hand-written files, since ids are not visible in Sweet Home 3D.
+- An object is matched by `id` first, then by `name` if the id is absent from
+  the home. The dialog writes this form, so a file keeps working after an
+  object is renamed and still makes sense when loaded into another home.
+- A name that matches more than one object is an error (CLI) or a dropped
+  reference (dialog Load).
+
+**Strictness.** Unknown keys, wrong types and an unsupported `version` are
+errors, so a misspelt key is reported rather than silently ignored.
 
 ## 6. Output layout
 
@@ -265,6 +361,7 @@ output=/path/to/out
   "generator": "ha-floorplan-exporter 0.1.0",
   "width": 1920, "height": 1080,
   "renderer": "SunFlow", "quality": "LOW",
+  "hideCeilings": true, "isolateLevel": false,
   "dates": ["2026-01-01", "2026-01-31"],
   "times": ["00:00", "04:00"],
   "nightTime": "2026-01-01T00:00", "nightSunElevation": -58.2,
@@ -296,7 +393,8 @@ scripts/build.sh            compile + package build/HaFloorplanExporter-<version
 scripts/test.sh             fetch JUnit console jar to lib/ if missing, run unit tests
 scripts/install.sh          copy the .sh3p to ~/.eteks/sweethome3d/plugins (replacing older versions)
 scripts/run.sh              build + install + launch sweethome3d [file]
-scripts/export-sample.sh    end-to-end headless export on a generated sample home
+scripts/export.sh           run HeadlessExport: export.sh <instructions.json> [--home …] [--output …]
+scripts/export-sample.sh    end-to-end export of a generated sample home, through export.sh
 docs/superpowers/specs/     this document
 ```
 
@@ -320,7 +418,13 @@ are not bundled.
 - `ExportPlanner`: job count and order; lights only on their own floor; no
   `NIGHT_BASE` for floors without selected lights; skipped lights.
 - `Slugs`: unsafe characters, collisions, empty names.
-- `ConfigProperties`: round trip, `*` wildcards, missing and malformed keys.
+- `Json`: round trip of every value type, string escapes, nested structures,
+  malformed input reports line and column.
+- `InstructionsJson`: round trip, defaults, `*` wildcards, both reference
+  forms, missing required keys, unknown keys, wrong types, bad `version`.
+- `InstructionsResolver`: id match, name match, id-then-name fallback,
+  ambiguous name, unknown reference, all problems reported together;
+  `toInstructions` followed by `resolve` returns the original config.
 - `ManifestWriter`: output parses as JSON and matches the plan (string
   escaping included).
 - `OverlayDiff`: identical images → fully transparent; known brightening →
@@ -328,33 +432,49 @@ are not bundled.
   behaviour; saturated base channel.
 - `Exporter` with a fake `RenderBackend` and a small in-memory `Home`: files
   written to the planned paths, light powers set as specified per job,
-  original home unchanged, cancellation leaves no manifest.
+  original home unchanged, cancellation leaves no manifest. With
+  `isolateLevel` on, the home handed to the backend for each job has only
+  that job's level viewable; with it off, every level keeps its original
+  viewable state.
 
 **End-to-end** (`scripts/export-sample.sh`): `SampleHomeFactory` (test source)
 builds a two-level home with one room per level, walls, a stored top-down
-camera per level and two lights taken from the default furniture catalog. The
-script runs `HeadlessExport` at 320×240, `LOW` quality, 1 date × 2 times, then
+camera per level and two lights taken from the default furniture catalog; the
+upper room has a floor opening so the lower level is visible through it. The
+script writes an instructions file naming the sample home, runs
+`scripts/export.sh` on it at 320×240, `LOW` quality, 1 date × 2 times, then
 asserts:
 
 - every file listed in `manifest.json` exists and is 320×240;
 - each light overlay has both fully transparent pixels and non-transparent
   pixels;
-- a noon base image is brighter on average than a midnight one.
+- a noon base image is brighter on average than a midnight one;
+- a second run with `isolateLevel` set to `true` produces an upper-floor noon
+  image that differs from the first run's, and a lower-floor one that does
+  not (the lower floor has nothing below it).
 
 **Manual** (`scripts/run.sh`): open a real home, run the dialog, check
 All/None, the render count, cancel, and that settings persist after save and
-reopen.
+reopen. Save an instructions file from the dialog, run it with
+`scripts/export.sh`, and compare the output with the dialog's own export.
+Load a file saved from a different home and check the warning.
 
 ## 9. Open points to settle during implementation
 
 1. Whether `setAllLevelsVisible(false)` + selected level is honoured by both
-   photo renderers (§4.2, fallback defined).
+   photo renderers (§4.2, fallback defined), and whether both honour
+   `Level.setViewable(false)`, which level isolation relies on. If a renderer
+   ignores it, the fallback is to remove the other levels' items from the
+   clone for the duration of that floor's jobs.
 2. Exact `Camera.setTime` time-zone convention (§4.2, verification defined).
 3. Whether rendering works with `java.awt.headless=true` (§4.4, fallback
    defined).
 4. Whether a `LOW`-quality SunFlow night render is fully dark with all lights
    off, or has ambient light; the overlay maths does not depend on it, but the
    default `noiseThreshold` may need tuning from sample output.
+5. Whether a floor opening can be built programmatically in
+   `SampleHomeFactory` (§8). If not, the isolation assertion compares against
+   a sample whose upper room simply has no floor over part of the lower one.
 
 ## 10. Suggested build order
 
@@ -363,7 +483,8 @@ reopen.
 2. `plan` package with unit tests.
 3. `OverlayDiff` with unit tests.
 4. `engine` with fake-backend tests.
-5. `Sh3dRenderBackend`, `SampleHomeFactory`, `HeadlessExport`,
+5. `Sh3dRenderBackend`, `SampleHomeFactory`, `HeadlessExport`, `export.sh`,
    `export-sample.sh`; resolve the open points in §9.
-6. `ExportDialog`, progress dialog, settings persistence.
+6. `ExportDialog`, progress dialog, settings persistence, Save / Load
+   instructions.
 7. README, licence headers, create the public GitHub repo and push.
