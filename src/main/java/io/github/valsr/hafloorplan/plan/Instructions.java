@@ -93,6 +93,10 @@ public final class Instructions {
         return toBuilder().home(home).build();
     }
 
+    public Instructions withAllLights() {
+        return toBuilder().allLights().build();
+    }
+
     public Instructions withOutput(String output) {
         return toBuilder().output(output).build();
     }

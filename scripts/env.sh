@@ -13,7 +13,8 @@ fi
 
 SH3D_CP="$(printf '%s:' "$SH3D_JARS"/*.jar "$SH3D_LIB"/java3d-1.5/*.jar)"
 SH3D_CP="${SH3D_CP%:}"
-SH3D_JAVA_OPTS="--add-opens=java.desktop/sun.awt=ALL-UNNAMED -Djava.library.path=$SH3D_LIB/java3d-1.5"
+# Same library path as the launcher of Sweet Home 3D: Java 3D, then YafaRay which is found through it
+SH3D_JAVA_OPTS="--add-opens=java.desktop/sun.awt=ALL-UNNAMED -Djava.library.path=$SH3D_LIB/java3d-1.5:$SH3D_LIB/yafaray"
 
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 PLUGIN_FILE="$ROOT/build/HaFloorplanExporter-$VERSION.sh3p"

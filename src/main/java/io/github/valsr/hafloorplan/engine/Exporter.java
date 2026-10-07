@@ -93,6 +93,20 @@ public final class Exporter {
     }
 
     /**
+     * Stops the running export and frees its renderer at once, without waiting for the thread running it.
+     * Meant for a program about to exit; otherwise use {@link #cancel()}. May be called from any thread.
+     */
+    public void abort() {
+        this.cancelled = true;
+        RenderSession session = this.session;
+        this.session = null;
+        if (session != null) {
+            session.stop();
+            session.close();
+        }
+    }
+
+    /**
      * Renders all the images then writes the manifest, a file missing if the export fails or is cancelled.
      * @param listener notified of each image, or <code>null</code>
      * @return <code>false</code> if the export was cancelled
@@ -103,6 +117,11 @@ public final class Exporter {
         Home clone = this.home.clone();
         HomeSummary summary = HomeInspector.summarize(clone, this.backend);
         validate(summary);
+        // A manifest marks a complete export: the one of a previous export mustn't outlive a failure of this one
+        File manifestFile = new File(this.config.getOutputDir(), MANIFEST_FILE);
+        if (manifestFile.exists() && !manifestFile.delete()) {
+            throw new ExportException(Collections.singletonList("Can't replace " + manifestFile));
+        }
 
         ExportPlan plan = ExportPlanner.plan(this.config, summary);
         List<RenderJob> jobs = plan.getJobs();
@@ -147,7 +166,12 @@ public final class Exporter {
                 camera.setTime(job.kind == RenderJob.Kind.BASE
                         ? SceneConfigurer.cameraTime(job.date, job.time)
                         : SceneConfigurer.cameraTime(nightTime.toLocalDate(), nightTime.toLocalTime()));
-                BufferedImage image = this.session.render(camera, this.config.getWidth(), this.config.getHeight());
+                RenderSession session = this.session;
+                if (session == null) {
+                    // Aborted
+                    return false;
+                }
+                BufferedImage image = session.render(camera, this.config.getWidth(), this.config.getHeight());
                 if (this.cancelled) {
                     // The interrupted image isn't complete
                     return false;
@@ -171,12 +195,18 @@ public final class Exporter {
 
             String manifest = ManifestWriter.write(this.config, summary, plan, this.generator, nightTime,
                     nightTime != null ? Double.valueOf(scene.sunElevation(nightTime)) : null);
-            Files.write(new File(this.config.getOutputDir(), MANIFEST_FILE).toPath(),
-                    manifest.getBytes(StandardCharsets.UTF_8));
+            Files.write(manifestFile.toPath(), manifest.getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (IOException ex) {
+            if (this.cancelled) {
+                // A renderer may fail because it was stopped
+                return false;
+            }
             throw failure(ex);
         } catch (RuntimeException ex) {
+            if (this.cancelled) {
+                return false;
+            }
             throw failure(ex);
         } finally {
             closeSession();

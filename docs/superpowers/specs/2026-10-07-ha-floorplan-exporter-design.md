@@ -248,6 +248,11 @@ it is an approximation; this is an accepted trade-off.
 - A failure during a render aborts the export; files already written are
   kept; no manifest is written, so a missing manifest marks an incomplete
   export.
+- An export starts by deleting the `manifest.json` of a previous export into
+  the same folder, so a manifest never describes a folder that a failed or
+  cancelled run left half-updated.
+- On the command line the only way to cancel is to interrupt the process: a
+  shutdown hook stops and closes the open session, and the exit code is 1.
 - Cancel calls `RenderSession.stop()` on the open session, stops after the current job, same
   outcome as a failure but reported as cancelled.
 - Existing files in the output dir are overwritten. The dialog warns if the
@@ -533,10 +538,10 @@ Load a file saved from a different home and check the warning.
 
 ## 9. Open points, as settled during implementation
 
-1. **Level hiding.** `Level.setVisible(false)` hides a level in SunFlow and in
-   the Blender renderer (checked on the sample home: the ground floor shows
-   beside the first floor, and disappears with `isolateLevel`). YafaRay is not
-   installed on the development machine; its source tests the same flag.
+1. **Level hiding.** `Level.setVisible(false)` hides a level in SunFlow,
+   YafaRay and the Blender renderer (checked with each on the sample home:
+   the ground floor shows beside the first floor, and disappears with
+   `isolateLevel`).
 2. **Camera time.** `Camera.time` holds the local wall-clock time as if it
    were UTC; renderers convert it with `Camera.convertTimeToTimeZone` and the
    compass time zone. The exporter builds it with

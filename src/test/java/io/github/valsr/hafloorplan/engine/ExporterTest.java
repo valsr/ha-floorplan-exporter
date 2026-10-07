@@ -295,6 +295,39 @@ class ExporterTest {
     }
 
     @Test
+    void failedReExportRemovesThePreviousManifest() throws Exception {
+        assertTrue(exporter(config().build()).run(null));
+        assertTrue(file("manifest.json").isFile());
+
+        this.backend.failOnRender = this.backend.sessions.get(0).cameraTimes.size() + 5 + 1;
+        assertThrows(ExportException.class, () -> exporter(config().build()).run(null));
+        // A manifest marks a complete export, and the folder now mixes images of two runs
+        assertFalse(file("manifest.json").exists());
+    }
+
+    @Test
+    void failureWhileCancellingIsACancel() throws Exception {
+        Exporter exporter = exporter(config().build());
+        this.backend.onRender = exporter::cancel;
+        // Some renderers throw an exception when they're stopped
+        this.backend.failOnRender = 0;
+        assertFalse(exporter.run(null));
+    }
+
+    @Test
+    void abortStopsAndClosesTheOpenSession() throws Exception {
+        Exporter exporter = exporter(config().build());
+        this.backend.onRender = exporter::abort;
+
+        assertFalse(exporter.run(null));
+
+        assertEquals(1, this.backend.sessions.size());
+        assertTrue(this.backend.sessions.get(0).stopped);
+        assertEquals(1, this.backend.sessions.get(0).closeCount);
+        assertFalse(file("manifest.json").exists());
+    }
+
+    @Test
     void listenerSeesEveryJob() throws Exception {
         List<String> events = new ArrayList<String>();
         exporter(config().build()).run(new ExportListener() {

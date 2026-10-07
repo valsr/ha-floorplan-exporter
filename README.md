@@ -76,6 +76,7 @@ by name and lists the rest.
 - Relative paths written in an instructions file start from the folder of that file; paths given
   as arguments, or in instructions read from standard input, start from the current folder.
 - The home is read from its file: save it in Sweet Home 3D before exporting.
+- Ctrl-C stops the renderer and removes its temporary files; no manifest is written.
 - Exit code 0 on success, 1 if rendering failed, 2 if the arguments, the instructions or the home
   can't be used. Unlike the dialog, the command line refuses instructions naming a floor, a point
   of view or a light the home doesn't have.

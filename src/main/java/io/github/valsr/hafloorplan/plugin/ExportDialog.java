@@ -425,6 +425,20 @@ class ExportDialog extends JDialog {
     }
 
     /**
+     * Returns the choices to keep in the home: without the path of the home and, when every light is selected,
+     * with "all lights" rather than their list, to include the lights added to the home later.
+     * @throws IllegalStateException if dates or times are invalid
+     */
+    Instructions getInstructionsToStore() {
+        Instructions instructions = getInstructions().withHome(null);
+        boolean allLights = !this.lightRows.isEmpty();
+        for (LightRow row : this.lightRows) {
+            allLights &= row.checkBox.isSelected();
+        }
+        return allLights ? instructions.withAllLights() : instructions;
+    }
+
+    /**
      * Returns the instructions matching the fields, or <code>null</code> after adding
      * to <code>errors</code> why dates or times can't be used.
      */

@@ -18,6 +18,7 @@
 package io.github.valsr.hafloorplan.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.InputStream;
@@ -55,6 +56,15 @@ class PluginDescriptorTest {
         assertEquals(1, libraries.size());
         assertEquals("HA Floorplan Exporter", libraries.get(0).getName());
         assertEquals("GPL-2.0-or-later", libraries.get(0).getLicense());
+    }
+
+    @Test
+    void messagesAreAsciiForJava8() throws Exception {
+        // Java 8 reads resource bundles as ISO-8859-1: other characters must be written as \\uXXXX
+        byte [] messages = Files.readAllBytes(Paths.get("src/main/resources/io/github/valsr/hafloorplan/plugin/Messages.properties"));
+        for (byte b : messages) {
+            assertTrue(b >= 0, "non ASCII character in Messages.properties");
+        }
     }
 
     @Test

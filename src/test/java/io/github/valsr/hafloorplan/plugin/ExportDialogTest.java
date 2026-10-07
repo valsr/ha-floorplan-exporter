@@ -185,6 +185,21 @@ class ExportDialogTest {
     }
 
     @Test
+    void stateKeptInTheHomeFollowsLightsAddedLater() {
+        ExportDialog dialog = dialog();
+        dialog.outputField.setText("/data/out");
+        // With every light ticked, a light added to the home later is exported too
+        Instructions stored = dialog.getInstructionsToStore();
+        assertTrue(stored.isAllLights());
+        assertEquals(null, stored.getHome());
+        assertEquals(2, stored.getFloors().size());
+
+        dialog.noLightsButton.doClick();
+        assertFalse(dialog.getInstructionsToStore().isAllLights());
+        assertTrue(dialog.getInstructionsToStore().getLights().isEmpty());
+    }
+
+    @Test
     void hideOtherLevelsDisabledWithoutLevels() {
         HomeSummary noLevels = new HomeSummary(
                 Arrays.asList(new HomeSummary.Floor(HomeSummary.DEFAULT_FLOOR_ID, "Home")),

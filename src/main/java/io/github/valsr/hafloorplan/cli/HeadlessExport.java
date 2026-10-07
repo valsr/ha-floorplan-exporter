@@ -52,10 +52,28 @@ public final class HeadlessExport {
     private static final int EXIT_EXPORT_FAILED = 1;
     private static final int EXIT_BAD_INPUT = 2;
 
+    private static volatile Exporter runningExporter;
+
     private HeadlessExport() {
     }
 
+    /**
+     * Stops the export in progress, if any, and frees its renderer.
+     */
+    static void abortRunningExport() {
+        Exporter exporter = runningExporter;
+        if (exporter != null) {
+            exporter.abort();
+        }
+    }
+
     public static void main(String [] args) {
+        // Ctrl-C is the only way to cancel: don't leave a renderer process or its temporary files behind
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            public void run() {
+                abortRunningExport();
+            }
+        }));
         // Exit explicitly because Java 3D and AWT may leave threads running
         System.exit(run(args, System.in, System.out, System.err, new Sh3dRenderBackend()));
     }
@@ -117,8 +135,10 @@ public final class HeadlessExport {
             return EXIT_BAD_INPUT;
         }
 
+        Exporter exporter = new Exporter(home, resolution.getConfig(), backend, Exporter.generatorName());
+        runningExporter = exporter;
         try {
-            new Exporter(home, resolution.getConfig(), backend, Exporter.generatorName()).run(new ExportListener() {
+            boolean completed = exporter.run(new ExportListener() {
                 @Override
                 public void jobStarted(int index, int total, RenderJob job) {
                 }
@@ -128,6 +148,10 @@ public final class HeadlessExport {
                     out.println("[" + (index + 1) + "/" + total + "] " + job.path);
                 }
             });
+            if (!completed) {
+                err.println("Export cancelled, no manifest written");
+                return EXIT_EXPORT_FAILED;
+            }
             return EXIT_OK;
         } catch (ExportException ex) {
             for (String problem : ex.getProblems()) {
@@ -135,6 +159,8 @@ public final class HeadlessExport {
             }
             // Without a cause, the settings were refused before any image was rendered
             return ex.getCause() == null ? EXIT_BAD_INPUT : EXIT_EXPORT_FAILED;
+        } finally {
+            runningExporter = null;
         }
     }
 

@@ -18,6 +18,7 @@
 package io.github.valsr.hafloorplan.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -167,6 +168,18 @@ class HeadlessExportTest {
         File job = write("job.json", "{\"version\":1,\"home\":\"h.sh3d\",\"output\":\"out\"," + REST + "}");
         assertEquals(1, run(job.getPath()));
         assertTrue(this.err.toString().contains("display"), this.err.toString());
+    }
+
+    @Test
+    void interruptedExportExitsWith1() throws Exception {
+        writeHome();
+        // What the shutdown hook does when the process is interrupted
+        this.backend.onRender = () -> HeadlessExport.abortRunningExport();
+        File job = write("job.json", "{\"version\":1,\"home\":\"h.sh3d\",\"output\":\"out\"," + REST + "}");
+        assertEquals(1, run(job.getPath()));
+        assertTrue(this.err.toString().contains("cancelled"), this.err.toString());
+        assertEquals(1, this.backend.sessions.get(0).closeCount);
+        assertFalse(path("out/manifest.json").exists());
     }
 
     @Test

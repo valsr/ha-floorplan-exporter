@@ -98,7 +98,7 @@ public class HaFloorplanPlugin extends Plugin {
         }
 
         Instructions instructions = dialog.getInstructions();
-        String newInstructions = InstructionsJson.write(instructions.withHome(null));
+        String newInstructions = InstructionsJson.write(dialog.getInstructionsToStore());
         if (!newInstructions.equals(storedInstructions)) {
             // The only change made to the home, to save the choices with it
             home.setProperty(INSTRUCTIONS_PROPERTY, newInstructions);
