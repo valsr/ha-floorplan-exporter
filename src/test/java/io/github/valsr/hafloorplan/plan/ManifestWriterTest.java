@@ -85,6 +85,7 @@ class ManifestWriterTest {
         assertEquals(1, skipped.size());
         assertEquals("s1", skipped.get(0).get("id"));
         assertEquals("Stray", skipped.get(0).get("name"));
+        assertEquals("not on an exported floor", skipped.get(0).get("reason"));
     }
 
     @Test

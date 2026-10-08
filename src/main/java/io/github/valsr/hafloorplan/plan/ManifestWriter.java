@@ -119,6 +119,7 @@ public final class ManifestWriter {
             HomeSummary.Light light = summary.light(lightId);
             skipped.put("id", lightId);
             skipped.put("name", light != null ? light.name : null);
+            skipped.put("reason", light != null && light.power <= 0 ? "off" : "not on an exported floor");
             skippedLights.add(skipped);
         }
         manifest.put("skippedLights", skippedLights);

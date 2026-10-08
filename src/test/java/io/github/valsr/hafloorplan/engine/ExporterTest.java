@@ -328,6 +328,20 @@ class ExporterTest {
     }
 
     @Test
+    void lightTurnedOffInTheHomeIsNotRendered() throws Exception {
+        ExportConfig config = config()
+                .lightIds(Arrays.asList(lightId("Kitchen lamp"), lightId("Unlit"), lightId("Desk"))).build();
+        assertTrue(exporter(config).run(null));
+
+        assertEquals(4, this.backend.sessions.size());
+        assertFalse(file("ground-floor/lights/unlit.png").exists());
+        String manifest = new String(Files.readAllBytes(file("manifest.json").toPath()), StandardCharsets.UTF_8);
+        Map<?, ?> skipped = (Map<?, ?>)((List<?>)((Map<?, ?>)Json.parse(manifest)).get("skippedLights")).get(0);
+        assertEquals("Unlit", skipped.get("name"));
+        assertEquals("off", skipped.get("reason"));
+    }
+
+    @Test
     void listenerSeesEveryJob() throws Exception {
         List<String> events = new ArrayList<String>();
         exporter(config().build()).run(new ExportListener() {

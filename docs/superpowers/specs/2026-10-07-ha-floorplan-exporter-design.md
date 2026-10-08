@@ -141,7 +141,10 @@ Job order produced by `ExportPlanner`, per floor: all `BASE` jobs (date major,
 time minor), then one `NIGHT_BASE` job if the floor has at least one selected
 light, then one `LIGHT` job per selected light on that floor. A light is
 planned only for the floor it sits on; selected lights on unselected floors
-are skipped and listed in the manifest's `skippedLights`.
+are skipped and listed in the manifest's `skippedLights`. A selected light
+whose power is 0 in the home is skipped the same way: it would cost a render
+and give an empty overlay. Each entry of `skippedLights` has the light's `id`,
+`name` and a `reason` (`"off"` or `"not on an exported floor"`).
 
 ### 4.2 `engine`
 

@@ -60,7 +60,7 @@ public final class HomeInspector {
             String floorId = levels
                     ? (light.getLevel() != null ? light.getLevel().getId() : null)
                     : HomeSummary.DEFAULT_FLOOR_ID;
-            lights.add(new HomeSummary.Light(light.getId(), light.getName(), floorId));
+            lights.add(new HomeSummary.Light(light.getId(), light.getName(), floorId, light.getPower()));
         }
 
         List<HomeSummary.Camera> cameras = new ArrayList<HomeSummary.Camera>();

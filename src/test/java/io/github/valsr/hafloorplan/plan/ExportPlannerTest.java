@@ -106,6 +106,36 @@ class ExportPlannerTest {
     }
 
     @Test
+    void skipsLightsTurnedOff() {
+        HomeSummary summary = new HomeSummary(
+                Arrays.asList(new HomeSummary.Floor("f1", "Ground floor")),
+                Arrays.asList(new HomeSummary.Light("on", "Lamp", "f1", 0.5f), new HomeSummary.Light("off", "Lamp", "f1", 0f)),
+                Collections.<HomeSummary.Camera>emptyList(), summary().getRenderers());
+        ExportPlan plan = ExportPlanner.plan(config()
+                .floors(Arrays.asList(new ExportConfig.Floor("f1", null)))
+                .lightIds(Arrays.asList("off", "on")).build(), summary);
+
+        // A light without power adds nothing to the scene: no overlay to render
+        List<RenderJob> jobs = plan.getJobs();
+        assertEquals(8, jobs.size());
+        assertEquals("on", jobs.get(7).lightId);
+        assertEquals("ground-floor/lights/lamp.png", jobs.get(7).path);
+        assertEquals(Arrays.asList("off"), plan.getSkippedLightIds());
+    }
+
+    @Test
+    void onlyLightsTurnedOffMeansNoNightBase() {
+        HomeSummary summary = new HomeSummary(
+                Arrays.asList(new HomeSummary.Floor("f1", "Ground floor")),
+                Arrays.asList(new HomeSummary.Light("off", "Lamp", "f1", 0f)),
+                Collections.<HomeSummary.Camera>emptyList(), summary().getRenderers());
+        ExportPlan plan = ExportPlanner.plan(config()
+                .floors(Arrays.asList(new ExportConfig.Floor("f1", null)))
+                .lightIds(Arrays.asList("off")).build(), summary);
+        assertEquals(Collections.nCopies(6, "f1:BASE"), kinds(plan.getJobs()));
+    }
+
+    @Test
     void noLightsNoNightBase() {
         ExportPlan plan = ExportPlanner.plan(config().build(), summary());
         assertEquals(12, plan.getJobs().size());

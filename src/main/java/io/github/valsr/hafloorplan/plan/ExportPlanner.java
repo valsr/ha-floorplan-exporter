@@ -36,7 +36,7 @@ public final class ExportPlanner {
 
     /**
      * Returns the plan of the export described by <code>config</code>. For each floor come its base images
-     * by date then time, then, if it has selected lights, its night base and one image per light.
+     * by date then time, then, if it has selected lights turned on, its night base and one image per light.
      */
     public static ExportPlan plan(ExportConfig config, HomeSummary summary) {
         List<RenderJob> jobs = new ArrayList<RenderJob>();
@@ -61,7 +61,9 @@ public final class ExportPlanner {
             Slugs lightNames = new Slugs();
             for (String lightId : config.getLightIds()) {
                 HomeSummary.Light light = summary.light(lightId);
-                if (light != null && floor.levelId.equals(light.floorId) && skippedLightIds.remove(lightId)) {
+                // A light turned off in the home adds nothing to the scene, so it gets no overlay
+                if (light != null && light.power > 0 && floor.levelId.equals(light.floorId)
+                        && skippedLightIds.remove(lightId)) {
                     String lightSlug = lightNames.unique(light.name);
                     lightSlugs.put(lightId, lightSlug);
                     lightJobs.add(new RenderJob(floor.levelId, RenderJob.Kind.LIGHT, null, null, lightId,

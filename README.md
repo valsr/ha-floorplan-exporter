@@ -52,7 +52,8 @@ Restart Sweet Home 3D; **Tools > Export for HA Floorplan…** appears.
 - **Dates** and **Times of day**: a start, an end and an interval. Both ends are included; one
   base image is rendered per floor, date and time.
 - **Lights**: the lights to make overlays for. A light is rendered on the floor it stands on,
-  at night, at the power it has in the home.
+  at night, at the power it has in the home. A light turned off in the home (power 0) or standing
+  on a floor that isn't exported gets no overlay and is listed under `skippedLights` in the manifest.
 - **Hide ceilings** (on by default) removes the ceilings of the exported floor so it can be seen
   from above.
 - **Hide other levels** renders each floor alone. When off, a floor is rendered with the levels

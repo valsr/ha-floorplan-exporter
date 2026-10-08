@@ -110,11 +110,21 @@ public final class HomeSummary {
         public final String name;
         /** Id of the floor the light is on, or <code>null</code> if it's on none. */
         public final String floorId;
+        /** Power of the light in the home, 0 if it's turned off. */
+        public final float power;
 
+        /**
+         * Creates a light turned on.
+         */
         public Light(String id, String name, String floorId) {
+            this(id, name, floorId, 1);
+        }
+
+        public Light(String id, String name, String floorId, float power) {
             this.id = id;
             this.name = name;
             this.floorId = floorId;
+            this.power = power;
         }
     }
 

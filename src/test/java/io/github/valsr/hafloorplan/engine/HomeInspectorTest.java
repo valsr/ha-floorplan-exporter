@@ -66,6 +66,13 @@ class HomeInspectorTest {
     }
 
     @Test
+    void recordsThePowerOfLights() {
+        HomeSummary summary = HomeInspector.summarize(TestHomes.twoLevels(), new FakeRenderBackend());
+        assertEquals(0.5f, lightNamed(summary, "Kitchen lamp").power);
+        assertEquals(0f, lightNamed(summary, "Unlit").power);
+    }
+
+    @Test
     void levelLessLightHasNoFloor() {
         Home home = TestHomes.twoLevels();
         HomeLight stray = TestHomes.light("Stray", 0.5f);

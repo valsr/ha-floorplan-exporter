@@ -52,7 +52,7 @@ public final class ExportPlan {
         return this.lightSlugs.get(lightId);
     }
 
-    /** Returns the selected lights that aren't exported because they aren't on a selected floor. */
+    /** Returns the selected lights that aren't exported: turned off in the home, or not on a selected floor. */
     public List<String> getSkippedLightIds() {
         return this.skippedLightIds;
     }
