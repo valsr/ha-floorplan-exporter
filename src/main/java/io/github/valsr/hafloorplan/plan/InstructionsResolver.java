@@ -119,8 +119,8 @@ public final class InstructionsResolver {
         LightCap capLight = instructions.getCapLight();
         HomeSummary.Renderer renderer = summary.renderer(rendererClassName);
         if (capLight != LightCap.OFF && renderer != null && !renderer.supportsLightCap) {
-            problems.add("capLight needs a renderer that can hide objects from the camera only (Blender GPU renderer); "
-                    + renderer.displayName + " cannot");
+            problems.add("capLight needs a renderer that can hide objects from the camera only, like a recent Blender GPU"
+                    + " renderer; the installed " + renderer.displayName + " cannot");
             capLight = LightCap.OFF;
         }
 

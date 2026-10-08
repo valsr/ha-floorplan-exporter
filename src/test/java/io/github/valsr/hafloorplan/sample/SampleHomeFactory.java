@@ -19,7 +19,12 @@ package io.github.valsr.hafloorplan.sample;
 
 import java.util.Arrays;
 
+import com.eteks.sweethome3d.io.DefaultFurnitureCatalog;
 import com.eteks.sweethome3d.io.HomeFileRecorder;
+import com.eteks.sweethome3d.model.CatalogDoorOrWindow;
+import com.eteks.sweethome3d.model.CatalogPieceOfFurniture;
+import com.eteks.sweethome3d.model.FurnitureCategory;
+import com.eteks.sweethome3d.model.HomeDoorOrWindow;
 import com.eteks.sweethome3d.model.Home;
 import com.eteks.sweethome3d.model.HomeLight;
 import com.eteks.sweethome3d.model.Level;
@@ -37,7 +42,7 @@ public final class SampleHomeFactory {
 
     /**
      * Returns a home with a 5 m x 4 m "Ground floor" and a "First floor" covering only its left half,
-     * so the ground floor shows beside it from above. Each has a light ("Kitchen lamp", "Desk")
+     * so the ground floor shows beside it from above. The ground floor has a window. Each has a light ("Kitchen lamp", "Desk")
      * and a stored camera looking straight down ("Top ground", "Top first").
      */
     public static Home create() {
@@ -50,6 +55,7 @@ public final class SampleHomeFactory {
         home.setSelectedLevel(ground);
         addRoom(home, "Kitchen", 500);
         addLight(home, "Kitchen lamp", 380, 200);
+        addWindow(home, 380, 0);
 
         home.setSelectedLevel(first);
         addRoom(home, "Office", 250);
@@ -75,6 +81,25 @@ public final class SampleHomeFactory {
         light.setX(x);
         light.setY(y);
         home.addPieceOfFurniture(light);
+    }
+
+    /**
+     * Adds a window of the default catalog in the wall along the x axis.
+     */
+    private static void addWindow(Home home, float x, float y) {
+        for (FurnitureCategory category : new DefaultFurnitureCatalog().getCategories()) {
+            for (CatalogPieceOfFurniture piece : category.getFurniture()) {
+                // Unlike doors, windows are placed above the floor
+                if (piece instanceof CatalogDoorOrWindow && piece.getElevation() > 0) {
+                    HomeDoorOrWindow window = new HomeDoorOrWindow((CatalogDoorOrWindow)piece);
+                    window.setX(x);
+                    window.setY(y);
+                    home.addPieceOfFurniture(window);
+                    return;
+                }
+            }
+        }
+        throw new IllegalStateException("No window in the default catalog");
     }
 
     public static void main(String [] args) throws Exception {

@@ -30,14 +30,17 @@ import javax.imageio.ImageIO;
 import io.github.valsr.hafloorplan.plan.Json;
 
 /**
- * Checks the two exports of the sample home made by <code>scripts/export-sample.sh</code>:
- * SampleAssertions out out-isolated
+ * Checks the exports of the sample home made by <code>scripts/export-sample.sh</code>:
+ * SampleAssertions out out-isolated [out-sun-capped out-capped]
  */
 public final class SampleAssertions {
     private static final int WIDTH = 320;
     private static final int HEIGHT = 240;
     /** Smallest mean difference per channel, from 0 to 255, expected when a level beside the floor disappears. */
     private static final double MIN_ISOLATION_DIFFERENCE = 1;
+
+    /** Mean value per channel, from 0 to 255, under which an image shows nothing. */
+    private static final double MIN_CAPPED_BRIGHTNESS = 3;
 
     private final List<String> failures = new ArrayList<String>();
 
@@ -51,6 +54,9 @@ public final class SampleAssertions {
         assertions.checkExport(output);
         assertions.checkExport(isolatedOutput);
         assertions.checkIsolation(output, isolatedOutput);
+        if (args.length > 3) {
+            assertions.checkLightCap(output, new File(args [2]), new File(args [3]));
+        }
         for (String failure : assertions.failures) {
             System.err.println("FAILED: " + failure);
         }
@@ -118,6 +124,29 @@ public final class SampleAssertions {
         check(firstDifference > MIN_ISOLATION_DIFFERENCE, "first floor should lose the ground floor beside it, changed by "
                 + firstDifference);
         check(groundDifference < firstDifference / 3, "ground floor has nothing under it but changed by " + groundDifference);
+    }
+
+    /**
+     * Checks that hidden ceilings and levels darken the ground floor at noon when they stop the sun,
+     * more when they stop all light, without hiding the floor from the camera.
+     */
+    private void checkLightCap(File output, File sunCappedOutput, File cappedOutput) throws Exception {
+        checkExport(sunCappedOutput);
+        checkExport(cappedOutput);
+        String noon = "ground-floor/base/2026-06-21_1200.png";
+        double open = brightness(read(output, noon));
+        double sunCapped = brightness(read(sunCappedOutput, noon));
+        double capped = brightness(read(cappedOutput, noon));
+        System.out.println("Ground floor at noon: " + open + " open, " + sunCapped + " without sun from above, "
+                + capped + " without light from above");
+        check(sunCapped < 0.9 * open, "stopping the sun from above should darken the ground floor");
+        check(capped < 0.9 * sunCapped, "stopping all light from above should darken the ground floor more");
+        check(capped > MIN_CAPPED_BRIGHTNESS, "the capped ground floor should still be seen, lit through its window");
+        for (File cappedFolder : new File [] {sunCappedOutput, cappedOutput}) {
+            String manifest = new String(Files.readAllBytes(new File(cappedFolder, "manifest.json").toPath()), StandardCharsets.UTF_8);
+            check(manifest.contains("\"capLight\": \"" + (cappedFolder == cappedOutput ? "all" : "sun") + "\""),
+                    cappedFolder + ": manifest should tell its light cap");
+        }
     }
 
     private BufferedImage read(File output, String path) throws Exception {

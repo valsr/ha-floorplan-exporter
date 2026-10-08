@@ -42,6 +42,7 @@ import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.Instructions;
 import io.github.valsr.hafloorplan.plan.InstructionsJson;
 import io.github.valsr.hafloorplan.plan.InstructionsResolver;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 import io.github.valsr.hafloorplan.plan.Ref;
 import io.github.valsr.hafloorplan.plan.TimeSchedule;
@@ -66,7 +67,7 @@ class ExportDialogTest {
                         new HomeSummary.Light("l3", "Desk", "f2")),
                 Arrays.asList(new HomeSummary.Camera("c1", "Top ground"), new HomeSummary.Camera("c2", "Top first")),
                 Arrays.asList(new HomeSummary.Renderer(SUNFLOW, "SunFlow"),
-                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)")));
+                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true)));
     }
 
     private static ExportDialog dialog() {
@@ -197,6 +198,39 @@ class ExportDialogTest {
         dialog.noLightsButton.doClick();
         assertFalse(dialog.getInstructionsToStore().isAllLights());
         assertTrue(dialog.getInstructionsToStore().getLights().isEmpty());
+    }
+
+    @Test
+    void capLightFollowsTheRenderer() {
+        ExportDialog dialog = dialog();
+        // SunFlow, selected first, can't cap light
+        assertFalse(dialog.capLightComboBox.isEnabled());
+        assertEquals(LightCap.OFF, dialog.getInstructions().getCapLight());
+
+        Instructions instructions = InstructionsResolver.toInstructions(
+                config().capLight(LightCap.SUN).build(), summary(), HOME_FILE.getAbsolutePath());
+        dialog.setInstructions(instructions);
+        assertTrue(dialog.getLoadWarnings().isEmpty());
+        assertTrue(dialog.capLightComboBox.isEnabled());
+        assertEquals(LightCap.SUN, dialog.getInstructions().getCapLight());
+        assertEquals(instructions, dialog.getInstructions());
+
+        dialog.capLightComboBox.setSelectedIndex(LightCap.ALL.ordinal());
+        assertEquals(LightCap.ALL, dialog.getInstructions().getCapLight());
+
+        // Back to a renderer unable to cap, the choice doesn't count
+        dialog.rendererComboBox.setSelectedIndex(0);
+        assertFalse(dialog.capLightComboBox.isEnabled());
+        assertEquals(LightCap.OFF, dialog.getInstructions().getCapLight());
+    }
+
+    @Test
+    void capLightDroppedWithAnotherRenderer() {
+        ExportDialog dialog = dialog();
+        dialog.setInstructions(InstructionsResolver.toInstructions(
+                config().rendererClassName(SUNFLOW).capLight(LightCap.ALL).build(), summary(), null));
+        assertEquals(1, dialog.getLoadWarnings().size(), dialog.getLoadWarnings().toString());
+        assertEquals(LightCap.OFF, dialog.getInstructions().getCapLight());
     }
 
     @Test

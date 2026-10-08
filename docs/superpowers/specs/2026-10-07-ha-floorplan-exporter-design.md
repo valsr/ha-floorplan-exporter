@@ -1,7 +1,7 @@
 # HA Floorplan Exporter — Design
 
 Date: 2026-10-07
-Status: implemented (§1–§10). §11 (light cap) is an amendment awaiting review.
+Status: implemented, including the light cap of §11.
 
 ## 1. Purpose
 
@@ -642,7 +642,7 @@ the option has two strengths instead of one switch.
   `"capLight"` with the lower-case names, optional, default `"off"`.
 - **Refusal.** With a renderer that cannot cap, `InstructionsResolver`
   reports `capLight needs a renderer that can hide objects from the camera
-  only (Blender GPU renderer); <name> cannot` and resolves to `OFF`; the
+  only, like a recent Blender GPU renderer; the installed <name> cannot` and resolves to `OFF`; the
   command line exits with 2, the dialog's Load lists it as a warning.
   `Exporter` validation refuses the combination as well.
 - **Scene set-up, session reuse, overlays.** Unchanged; every job of a floor
