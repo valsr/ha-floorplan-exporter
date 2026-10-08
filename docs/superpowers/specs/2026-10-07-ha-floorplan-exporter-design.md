@@ -595,112 +595,59 @@ room only through its windows and openings.
 Not in scope: any change to what the camera sees; SunFlow or YafaRay support
 (neither can hide an object from the camera only).
 
-### 11.3 Decisions
+### 11.3 Decisions (as built)
+
+Test renders of a real home showed that blocking all light leaves rooms
+without windows or lamps almost black at the renderer's outdoor exposure, so
+the option has two strengths instead of one switch.
 
 | Topic | Decision |
 |---|---|
-| Option | One switch, `capLight`, default off. Dialog label: "Block light through hidden ceilings and levels". |
-| What blocks light | Everything the export hides: the ceilings of the exported floor, every level above it, and, with `isolateLevel`, every level below it. One switch for top and bottom. |
-| Mechanism | The hidden parts stay in the rendered scene as objects invisible to camera rays only. They cast shadows, block the sky and bounce light like any other surface. |
-| Renderers | Only renderers that declare support (§11.5); today the Blender GPU renderer. With any other, the dialog disables the switch and the command line refuses the instructions before rendering. |
-| Where the work is | Mostly in `/work/sh3d/gpu-renderer`, which today does not export hidden items at all. The exporter only asks for the behaviour. |
+| Option | `capLight`: `"off"` (default), `"sun"` or `"all"`. Dialog: a choice "Light through hidden ceilings and levels" with *Not blocked*, *Block direct sun*, *Block all light*. |
+| `sun` | Hidden parts stop only rays going straight to the sun. Sky light still reaches the rooms from above; sun patches appear only where the sun really comes through a window or an opening. |
+| `all` | Hidden parts behave like any object for light: rooms get light only through windows, openings and lamps. |
+| What blocks light | Everything the export hides: the ceilings of the exported floor, every viewable level above it, and, with `isolateLevel`, every viewable level below it. Levels marked not viewable in the home stay out, cap or not. |
+| Renderers | Only renderers that declare support; today the Blender GPU renderer. With any other, the dialog disables the choice and the command line refuses the instructions before rendering. |
 
-### 11.4 GPU renderer change
+### 11.4 GPU renderer (`/work/sh3d/gpu-renderer`)
 
-A new rendering parameter, `hiddenItemsBlockLight`, default `false` for both
-quality levels in `BlenderRenderer.properties`. Like every rendering
-parameter it can be overridden with a system property
-(`sh3d.gpurenderer.BlenderRenderer.lowQuality.hiddenItemsBlockLight`,
-`…highQuality…`); `BlenderRenderer` reads it when it exports the scene.
+- Rendering parameter `hiddenItemsBlockLight`: `false` (default), `sun` or
+  `all` (`true` means `all`), overridable like every rendering parameter with
+  the system properties
+  `sh3d.gpurenderer.BlenderRenderer.lowQuality.hiddenItemsBlockLight` and
+  `…highQuality…`.
+- When it is not `false`, `SceneExporter` writes the hidden ceilings (ceiling
+  alone) and the items of viewable but invisible levels in a second file,
+  `occluders.obj`, built from a clone of the home so the home is untouched.
+  `scene.json` then has `"occluders": "occluders.obj"` and
+  `"occludersBlock": "sun" | "all"`. A separate file is needed because
+  Blender imports an OBJ written by Sweet Home 3D as a single object, and it
+  keeps `scene.obj` byte-identical to an export without cap.
+- `worker.py` imports that file and sets `visible_camera = False` on its
+  objects. For `sun` it also gives them one material that is transparent
+  except for rays within 3 degrees of the sun's direction, and raises the
+  transparent bounce limit so other rays cross them freely.
 
-When it is `true`, `SceneExporter` writes a second group of objects, named
-`occluder<N>`, after the visible items:
+### 11.5 Exporter
 
-- for every room on a visible level whose ceiling is hidden: its ceiling
-  alone;
-- for every item (wall, room, piece of furniture, …) on a level that is
-  viewable but not visible: the whole item.
-
-They are built from copies of the model objects (a copy of the room with its
-ceiling shown and its floor hidden; a copy of the item attached to a copy of
-its level made visible), so the home given to the renderer is not modified.
-Items on a level the user marked as not viewable stay out, as today. Hidden
-lamps give no light and hidden rooms get no default ceiling light, as today:
-occluders only block and bounce.
-
-`worker.py` sets `visible_camera = False` on every object whose name starts
-with `occluder`. Nothing else changes: the same materials, the same sun and
-sky.
-
-With the parameter `false` the exported scene is byte-for-byte what it is
-today.
-
-### 11.5 Exporter change
-
-- **Capability.** A renderer supports the cap if its resource bundle (the
-  `.properties` file named after its class) has the key
-  `lowQuality.hiddenItemsBlockLight`. `Sh3dRenderBackend` reads this when it
-  lists renderers; `HomeSummary.Renderer` gains `boolean supportsLightCap`.
-  No reference to the GPU renderer's classes, and an older `gpu-renderer.jar`
-  without the parameter simply shows as unsupported.
+- **Capability.** A renderer supports the cap if its resource bundle has the
+  key `lowQuality.hiddenItemsBlockLight`; `HomeSummary.Renderer` has
+  `supportsLightCap`. No reference to the GPU renderer's classes; an older
+  `gpu-renderer.jar` shows as unsupported.
 - **Asking for it.** `RenderBackend.open(home, rendererClassName, quality,
-  capLight)`. `Sh3dRenderBackend` sets the renderer's two
-  `…Quality.hiddenItemsBlockLight` system properties to `"true"` before
-  creating the renderer and puts back their previous values when the session
-  closes, so the setting lasts exactly as long as the session and nothing
-  leaks into Sweet Home 3D's own photo dialog.
-- **Config.** `ExportConfig.capLight`, `Instructions.capLight`, JSON key
-  `"capLight"` (optional, default `false`).
-- **Refusal.** `InstructionsResolver` reports
-  `capLight needs a renderer that can hide objects from the camera only
-  (Blender GPU renderer); <name> cannot` and resolves the flag to `false`.
-  The command line treats it like any other problem (exit 2, nothing
-  rendered); the dialog's Load lists it as a warning. `Exporter` validation
-  refuses the combination as well.
-- **Dialog.** A checkbox under "Hide other levels", enabled only while the
-  selected renderer supports the cap; when disabled it counts as off and its
-  tooltip says why.
-- **Scene set-up, session reuse, overlays.** Unchanged. The home is put in
-  the same state as today; all jobs of a floor (base, night base, lights) are
-  rendered with the same `capLight`, so overlays still align with and
-  difference against their night base.
-- **Manifest.** `"capLight": true|false` beside `isolateLevel`.
-
-### 11.6 Testing
-
-GPU renderer:
-
-- `SceneExporterTest`: with the parameter on, a two-level home with the upper
-  level invisible and a hidden ceiling on the lower one yields `occluder`
-  objects for the ceiling and for the upper level's items; with it off, the
-  OBJ has no `occluder` object; a non-viewable level yields none either way;
-  the home is unchanged afterwards.
-- `test_worker.py`: after loading a scene with an `occluder0` object, that
-  object has `visible_camera == False` and the others `True`.
-
-Exporter:
-
-- `InstructionsJson`: `capLight` round trip, default, wrong type.
-- `InstructionsResolver`: supported renderer keeps the flag; unsupported one
-  gives the problem and `false`.
-- `Exporter` with the fake backend: the flag reaches every `open` call;
-  unsupported renderer fails validation before any session.
-- `Sh3dRenderBackend`: the system properties are set while a session is open
-  and restored after `close()`, including a value that was set beforehand.
-- `ExportDialog`: checkbox enabled only for a supporting renderer; state
-  round trip; disabled means `false`.
-- End-to-end (`RENDERER=BlenderRenderer scripts/export-sample.sh` only): a
-  third export with `capLight` on. The ground floor's noon image must be
-  clearly darker than the uncapped one (the sun no longer falls in from
-  above) yet not black (the camera still sees the lit room through its
-  hidden ceiling); the sample gets a window on the ground floor so capped
-  rooms still receive daylight.
-
-### 11.7 Order of work
-
-1. GPU renderer: parameter, occluder export, `worker.py`, its tests; rebuild
-   the jar.
-2. Exporter: capability and `open` signature, config and JSON, resolver and
-   validation, manifest.
-3. Dialog checkbox; README; end-to-end run and a re-render of the reference
-   second-floor image for comparison.
+  LightCap)`. For `SUN` or `ALL`, `Sh3dRenderBackend` sets the renderer's two
+  system properties before creating the renderer and restores their previous
+  values when the session closes or fails to open.
+- **Config.** `enum LightCap { OFF, SUN, ALL }` in `plan`; JSON key
+  `"capLight"` with the lower-case names, optional, default `"off"`.
+- **Refusal.** With a renderer that cannot cap, `InstructionsResolver`
+  reports `capLight needs a renderer that can hide objects from the camera
+  only (Blender GPU renderer); <name> cannot` and resolves to `OFF`; the
+  command line exits with 2, the dialog's Load lists it as a warning.
+  `Exporter` validation refuses the combination as well.
+- **Scene set-up, session reuse, overlays.** Unchanged; every job of a floor
+  uses the same cap, so overlays still difference against their night base.
+- **Manifest.** `"capLight": "off" | "sun" | "all"`.
+- **Installed renderer.** `scripts/export.sh` prefers the renderer installed
+  in `/usr/lib/sweethome3d/gpu-renderer/`; after changing the renderer run
+  `sudo make install` there, or point `SH3D_GPU_RENDERER_JAR` at the build.

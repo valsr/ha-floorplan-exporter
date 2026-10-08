@@ -156,7 +156,7 @@ public final class Exporter {
                         camera = scene.camera(getCameraId(floorId));
                     }
                     scene.setLights(job.lightId);
-                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality());
+                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), false);
                     if (this.cancelled) {
                         // Cancelled while the session was opening
                         return false;

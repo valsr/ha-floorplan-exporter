@@ -36,6 +36,8 @@ public interface RenderBackend {
 
     /**
      * Returns a session rendering <code>home</code> in its current state.
+     * @param capLight if <code>true</code>, the ceilings and levels hidden in <code>home</code> still block light
+     *     without being seen, which only renderers with {@link HomeSummary.Renderer#supportsLightCap} can do
      */
-    RenderSession open(Home home, String rendererClassName, Quality quality) throws IOException;
+    RenderSession open(Home home, String rendererClassName, Quality quality, boolean capLight) throws IOException;
 }
