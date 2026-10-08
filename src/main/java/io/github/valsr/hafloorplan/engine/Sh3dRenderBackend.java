@@ -31,6 +31,7 @@ import com.eteks.sweethome3d.model.Camera;
 import com.eteks.sweethome3d.model.Home;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 
 /**
@@ -39,7 +40,7 @@ import io.github.valsr.hafloorplan.plan.Quality;
  * like the Blender GPU renderer once its Java agent is loaded.
  */
 public final class Sh3dRenderBackend implements RenderBackend {
-    /** Rendering parameter telling a renderer that the ceilings and levels hidden in a home still block light. */
+    /** Rendering parameter telling a renderer what the ceilings and levels hidden in a home still block. */
     private static final String LIGHT_CAP_PARAMETER = "hiddenItemsBlockLight";
 
     private List<HomeSummary.Renderer> renderers;
@@ -85,13 +86,13 @@ public final class Sh3dRenderBackend implements RenderBackend {
      * Sets the light cap parameter of a renderer for its two quality levels, with the system properties
      * renderers read their parameters from, and returns the action which puts back their previous values.
      */
-    static Runnable setLightCap(String rendererClassName, boolean capLight) {
+    static Runnable setLightCap(String rendererClassName, LightCap capLight) {
         final String [] properties = {
             rendererClassName + ".lowQuality." + LIGHT_CAP_PARAMETER,
             rendererClassName + ".highQuality." + LIGHT_CAP_PARAMETER};
         final String [] previousValues = new String [properties.length];
         for (int i = 0; i < properties.length; i++) {
-            previousValues [i] = System.setProperty(properties [i], String.valueOf(capLight));
+            previousValues [i] = System.setProperty(properties [i], capLight == LightCap.OFF ? "false" : capLight.toText());
         }
         return new Runnable() {
             public void run() {
@@ -107,10 +108,10 @@ public final class Sh3dRenderBackend implements RenderBackend {
     }
 
     @Override
-    public RenderSession open(Home home, String rendererClassName, Quality quality, boolean capLight) throws IOException {
+    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) throws IOException {
         // Kept for the whole session because a renderer may read its parameters when it renders its first image
-        final Runnable restoreLightCap = capLight
-                ? setLightCap(rendererClassName, true)
+        final Runnable restoreLightCap = capLight != LightCap.OFF
+                ? setLightCap(rendererClassName, capLight)
                 : null;
         final AbstractPhotoRenderer renderer;
         try {

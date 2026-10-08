@@ -39,6 +39,7 @@ import io.github.valsr.hafloorplan.plan.ExportConfig;
 import io.github.valsr.hafloorplan.plan.ExportPlan;
 import io.github.valsr.hafloorplan.plan.ExportPlanner;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.ManifestWriter;
 import io.github.valsr.hafloorplan.plan.RenderJob;
 
@@ -156,7 +157,7 @@ public final class Exporter {
                         camera = scene.camera(getCameraId(floorId));
                     }
                     scene.setLights(job.lightId);
-                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), false);
+                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), this.config.getCapLight());
                     if (this.cancelled) {
                         // Cancelled while the session was opening
                         return false;
@@ -265,6 +266,10 @@ public final class Exporter {
                 problem += " (is the gpu-renderer agent loaded and Blender installed?)";
             }
             problems.add(problem);
+        }
+        HomeSummary.Renderer renderer = summary.renderer(this.config.getRendererClassName());
+        if (this.config.getCapLight() != LightCap.OFF && renderer != null && !renderer.supportsLightCap) {
+            problems.add("Renderer " + renderer.displayName + " cannot block light through hidden ceilings and levels");
         }
         File outputDir = this.config.getOutputDir();
         if (outputDir == null) {

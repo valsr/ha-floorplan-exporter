@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 import com.eteks.sweethome3d.j3d.PhotoRenderer;
 
+import io.github.valsr.hafloorplan.plan.LightCap;
+
 class Sh3dRenderBackendTest {
     private static final String LOW = "x.Y.lowQuality.hiddenItemsBlockLight";
     private static final String HIGH = "x.Y.highQuality.hiddenItemsBlockLight";
@@ -51,9 +53,9 @@ class Sh3dRenderBackendTest {
     void setLightCapSetsAndRestoresProperties() {
         System.setProperty(LOW, "keep");
 
-        Runnable restore = Sh3dRenderBackend.setLightCap("x.Y", true);
-        assertEquals("true", System.getProperty(LOW));
-        assertEquals("true", System.getProperty(HIGH));
+        Runnable restore = Sh3dRenderBackend.setLightCap("x.Y", LightCap.SUN);
+        assertEquals("sun", System.getProperty(LOW));
+        assertEquals("sun", System.getProperty(HIGH));
 
         restore.run();
         assertEquals("keep", System.getProperty(LOW));

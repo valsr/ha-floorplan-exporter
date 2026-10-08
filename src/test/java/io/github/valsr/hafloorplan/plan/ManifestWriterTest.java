@@ -51,6 +51,7 @@ class ManifestWriterTest {
         assertEquals("LOW", manifest.get("quality"));
         assertEquals(Boolean.FALSE, manifest.get("hideCeilings"));
         assertEquals(Boolean.TRUE, manifest.get("isolateLevel"));
+        assertEquals("off", manifest.get("capLight"));
         assertEquals(Arrays.asList("2026-01-01", "2026-01-31"), manifest.get("dates"));
         assertEquals(Arrays.asList("00:00", "04:00", "08:00"), manifest.get("times"));
         assertEquals("2026-01-01T00:00", manifest.get("nightTime"));

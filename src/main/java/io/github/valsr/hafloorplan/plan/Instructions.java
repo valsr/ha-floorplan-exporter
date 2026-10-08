@@ -41,6 +41,7 @@ public final class Instructions {
     private final Quality quality;
     private final boolean hideCeilings;
     private final boolean isolateLevel;
+    private final LightCap capLight;
     private final int noiseThreshold;
 
     private Instructions(Builder builder) {
@@ -58,6 +59,7 @@ public final class Instructions {
         this.quality = builder.quality;
         this.hideCeilings = builder.hideCeilings;
         this.isolateLevel = builder.isolateLevel;
+        this.capLight = builder.capLight;
         this.noiseThreshold = builder.noiseThreshold;
     }
 
@@ -85,6 +87,7 @@ public final class Instructions {
         builder.quality = this.quality;
         builder.hideCeilings = this.hideCeilings;
         builder.isolateLevel = this.isolateLevel;
+        builder.capLight = this.capLight;
         builder.noiseThreshold = this.noiseThreshold;
         return builder;
     }
@@ -161,6 +164,11 @@ public final class Instructions {
         return this.isolateLevel;
     }
 
+    /** Returns what hidden ceilings and levels still block. */
+    public LightCap getCapLight() {
+        return this.capLight;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -178,7 +186,7 @@ public final class Instructions {
                 && this.width == other.width && this.height == other.height
                 && Objects.equals(this.renderer, other.renderer) && this.quality == other.quality
                 && this.hideCeilings == other.hideCeilings && this.isolateLevel == other.isolateLevel
-                && this.noiseThreshold == other.noiseThreshold;
+                && this.capLight == other.capLight && this.noiseThreshold == other.noiseThreshold;
     }
 
     @Override
@@ -235,6 +243,7 @@ public final class Instructions {
         private Quality quality = Quality.LOW;
         private boolean hideCeilings = true;
         private boolean isolateLevel;
+        private LightCap capLight = LightCap.OFF;
         private int noiseThreshold = 6;
 
         private Builder() {
@@ -311,6 +320,11 @@ public final class Instructions {
 
         public Builder isolateLevel(boolean isolateLevel) {
             this.isolateLevel = isolateLevel;
+            return this;
+        }
+
+        public Builder capLight(LightCap capLight) {
+            this.capLight = capLight;
             return this;
         }
 

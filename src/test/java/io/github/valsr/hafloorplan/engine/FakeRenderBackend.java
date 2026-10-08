@@ -35,6 +35,7 @@ import com.eteks.sweethome3d.model.Level;
 import com.eteks.sweethome3d.model.Room;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 
 /**
@@ -59,7 +60,7 @@ public class FakeRenderBackend implements RenderBackend {
     }
 
     @Override
-    public RenderSession open(Home home, String rendererClassName, Quality quality, boolean capLight) {
+    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) {
         Session session = new Session(home, rendererClassName, quality, capLight);
         this.sessions.add(session);
         return session;
@@ -78,7 +79,7 @@ public class FakeRenderBackend implements RenderBackend {
     public class Session implements RenderSession {
         public final String rendererClassName;
         public final Quality quality;
-        public final boolean capLight;
+        public final LightCap capLight;
         /** Power of each light by name when the session was opened. */
         public final Map<String, Float> lightPowers = new LinkedHashMap<String, Float>();
         /** Visibility of each level by name when the session was opened. */
@@ -91,7 +92,7 @@ public class FakeRenderBackend implements RenderBackend {
         public int closeCount;
         private int litCount;
 
-        Session(Home home, String rendererClassName, Quality quality, boolean capLight) {
+        Session(Home home, String rendererClassName, Quality quality, LightCap capLight) {
             this.rendererClassName = rendererClassName;
             this.quality = quality;
             this.capLight = capLight;

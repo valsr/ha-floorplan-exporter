@@ -23,6 +23,7 @@ import java.util.List;
 import com.eteks.sweethome3d.model.Home;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 
 /**
@@ -36,8 +37,9 @@ public interface RenderBackend {
 
     /**
      * Returns a session rendering <code>home</code> in its current state.
-     * @param capLight if <code>true</code>, the ceilings and levels hidden in <code>home</code> still block light
-     *     without being seen, which only renderers with {@link HomeSummary.Renderer#supportsLightCap} can do
+     * @param capLight what the ceilings and levels hidden in <code>home</code> still block without being seen;
+     *     only renderers with {@link HomeSummary.Renderer#supportsLightCap} accept another value than
+     *     {@link LightCap#OFF}
      */
-    RenderSession open(Home home, String rendererClassName, Quality quality, boolean capLight) throws IOException;
+    RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) throws IOException;
 }
