@@ -112,6 +112,7 @@ class ExportDialog extends JDialog {
     final JComboBox<String> capLightComboBox = new JComboBox<String>(new String [] {
             MESSAGES.getString("options.capLight.off"), MESSAGES.getString("options.capLight.sun"),
             MESSAGES.getString("options.capLight.all")});
+    final JSpinner exposureSpinner = new JSpinner(new SpinnerNumberModel(0., -10., 10., 0.25));
     final JTextField outputField = new JTextField(30);
     private final JLabel summaryLabel = new JLabel(" ");
     private final JLabel errorLabel = new JLabel(" ");
@@ -145,6 +146,7 @@ class ExportDialog extends JDialog {
                                                 this.dateIntervalSpinner, this.timeIntervalSpinner}) {
             spinner.setEditor(new JSpinner.NumberEditor(spinner, "#"));
         }
+        this.exposureSpinner.setEditor(new JSpinner.NumberEditor(this.exposureSpinner, "0.##"));
         String today = LocalDate.now().toString();
         this.startDateField.setText(today);
         this.endDateField.setText(today);
@@ -231,6 +233,8 @@ class ExportDialog extends JDialog {
         optionsPanel.add(new JLabel(MESSAGES.getString("options.capLight")), constraints);
         constraints.gridy++;
         optionsPanel.add(this.capLightComboBox, constraints);
+        constraints.gridwidth = 1;
+        addOption(optionsPanel, constraints, "options.exposure", this.exposureSpinner);
 
         JButton browseButton = new JButton(MESSAGES.getString("output.browse"));
         browseButton.addActionListener(new ActionListener() {
@@ -509,6 +513,7 @@ class ExportDialog extends JDialog {
                 .capLight(isLightCapSupported()
                         ? LightCap.values() [this.capLightComboBox.getSelectedIndex()]
                         : LightCap.OFF)
+                .exposure(isExposureSupported() ? ((Number)this.exposureSpinner.getValue()).doubleValue() : 0)
                 .noiseThreshold(this.noiseThreshold)
                 .build();
     }
@@ -520,6 +525,15 @@ class ExportDialog extends JDialog {
         Item rendererItem = (Item)this.rendererComboBox.getSelectedItem();
         HomeSummary.Renderer renderer = rendererItem != null ? this.summary.renderer(rendererItem.id) : null;
         return renderer != null && renderer.supportsLightCap;
+    }
+
+    /**
+     * Returns <code>true</code> if the selected renderer has an exposure setting.
+     */
+    private boolean isExposureSupported() {
+        Item rendererItem = (Item)this.rendererComboBox.getSelectedItem();
+        HomeSummary.Renderer renderer = rendererItem != null ? this.summary.renderer(rendererItem.id) : null;
+        return renderer != null && renderer.supportsExposure;
     }
 
     private static LocalDate parseDate(JTextField field, String errorKey, List<String> errors) {
@@ -578,6 +592,7 @@ class ExportDialog extends JDialog {
             this.hideCeilingsCheckBox.setSelected(config.isHideCeilings());
             this.isolateCheckBox.setSelected(config.isIsolateLevel());
             this.capLightComboBox.setSelectedIndex(config.getCapLight().ordinal());
+            this.exposureSpinner.setValue(config.getExposure());
             this.noiseThreshold = config.getNoiseThreshold();
             this.outputField.setText(config.getOutputDir() != null ? config.getOutputDir().getPath() : "");
         } finally {
@@ -634,6 +649,10 @@ class ExportDialog extends JDialog {
         this.capLightComboBox.setEnabled(lightCapSupported);
         this.capLightComboBox.setToolTipText(MESSAGES.getString(
                 lightCapSupported ? "options.capLight.tooltip" : "options.capLight.unavailable"));
+        boolean exposureSupported = isExposureSupported();
+        this.exposureSpinner.setEnabled(exposureSupported);
+        this.exposureSpinner.setToolTipText(MESSAGES.getString(
+                exposureSupported ? "options.exposure.tooltip" : "options.exposure.unavailable"));
         List<String> errors = getValidationErrors();
         this.errorLabel.setText(errors.isEmpty() ? " " : errors.get(0));
         String summaryText = getSummaryText();

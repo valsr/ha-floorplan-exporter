@@ -42,6 +42,8 @@ import io.github.valsr.hafloorplan.plan.Quality;
 public final class Sh3dRenderBackend implements RenderBackend {
     /** Rendering parameter telling a renderer what the ceilings and levels hidden in a home still block. */
     private static final String LIGHT_CAP_PARAMETER = "hiddenItemsBlockLight";
+    /** Rendering parameter giving the exposure of images in stops. */
+    private static final String EXPOSURE_PARAMETER = "exposure";
 
     private List<HomeSummary.Renderer> renderers;
 
@@ -55,7 +57,7 @@ public final class Sh3dRenderBackend implements RenderBackend {
                         className, new Home(), null, AbstractPhotoRenderer.Quality.LOW);
                 if (renderer.getClass().getName().equals(className) && renderer.isAvailable()) {
                     renderers.add(new HomeSummary.Renderer(className, renderer.getName(),
-                            supportsLightCap(renderer.getClass())));
+                            supportsLightCap(renderer.getClass()), supportsExposure(renderer.getClass())));
                 }
                 renderer.dispose();
             }
@@ -69,9 +71,21 @@ public final class Sh3dRenderBackend implements RenderBackend {
      * among its rendering parameters, in the resource bundle named after its class.
      */
     static boolean supportsLightCap(Class<?> rendererClass) {
+        return hasParameter(rendererClass, LIGHT_CAP_PARAMETER);
+    }
+
+    /**
+     * Returns <code>true</code> if the renderer declares the parameter {@link #EXPOSURE_PARAMETER}
+     * among its rendering parameters.
+     */
+    static boolean supportsExposure(Class<?> rendererClass) {
+        return hasParameter(rendererClass, EXPOSURE_PARAMETER);
+    }
+
+    private static boolean hasParameter(Class<?> rendererClass, String parameter) {
         try {
             return ResourceBundle.getBundle(rendererClass.getName(), Locale.ROOT, getClassLoader(rendererClass))
-                    .containsKey("lowQuality." + LIGHT_CAP_PARAMETER);
+                    .containsKey("lowQuality." + parameter);
         } catch (MissingResourceException ex) {
             return false;
         }
@@ -87,12 +101,24 @@ public final class Sh3dRenderBackend implements RenderBackend {
      * renderers read their parameters from, and returns the action which puts back their previous values.
      */
     static Runnable setLightCap(String rendererClassName, LightCap capLight) {
+        return setParameter(rendererClassName, LIGHT_CAP_PARAMETER, capLight == LightCap.OFF ? "false" : capLight.toText());
+    }
+
+    /**
+     * Sets the exposure parameter of a renderer for its two quality levels and returns the action
+     * which puts back their previous values.
+     */
+    static Runnable setExposure(String rendererClassName, double exposure) {
+        return setParameter(rendererClassName, EXPOSURE_PARAMETER, String.valueOf(exposure));
+    }
+
+    private static Runnable setParameter(String rendererClassName, String parameter, String value) {
         final String [] properties = {
-            rendererClassName + ".lowQuality." + LIGHT_CAP_PARAMETER,
-            rendererClassName + ".highQuality." + LIGHT_CAP_PARAMETER};
+            rendererClassName + ".lowQuality." + parameter,
+            rendererClassName + ".highQuality." + parameter};
         final String [] previousValues = new String [properties.length];
         for (int i = 0; i < properties.length; i++) {
-            previousValues [i] = System.setProperty(properties [i], capLight == LightCap.OFF ? "false" : capLight.toText());
+            previousValues [i] = System.setProperty(properties [i], value);
         }
         return new Runnable() {
             public void run() {
@@ -108,10 +134,18 @@ public final class Sh3dRenderBackend implements RenderBackend {
     }
 
     @Override
-    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) throws IOException {
-        // Set whatever the cap is, to override a parameter Sweet Home 3D could have been started with, and kept
+    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight,
+                              double exposure) throws IOException {
+        // Set whatever their value is, to override parameters Sweet Home 3D could have been started with, and kept
         // for the whole session because a renderer may read its parameters when it renders its first image
-        final Runnable restoreLightCap = setLightCap(rendererClassName, capLight);
+        final Runnable restoreCap = setLightCap(rendererClassName, capLight);
+        final Runnable restoreExposure = setExposure(rendererClassName, exposure);
+        final Runnable restoreParameters = new Runnable() {
+            public void run() {
+                restoreExposure.run();
+                restoreCap.run();
+            }
+        };
         AbstractPhotoRenderer openedRenderer = null;
         try {
             AbstractPhotoRenderer createdRenderer = AbstractPhotoRenderer.createInstance(
@@ -124,7 +158,7 @@ public final class Sh3dRenderBackend implements RenderBackend {
         } finally {
             if (openedRenderer == null) {
                 // Whatever failed, Sweet Home 3D's own photo dialog mustn't inherit the parameter
-                restoreLightCap.run();
+                restoreParameters.run();
             }
         }
         final AbstractPhotoRenderer renderer = openedRenderer;
@@ -146,7 +180,7 @@ public final class Sh3dRenderBackend implements RenderBackend {
                 try {
                     renderer.dispose();
                 } finally {
-                    restoreLightCap.run();
+                    restoreParameters.run();
                 }
             }
         };

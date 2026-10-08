@@ -80,11 +80,39 @@ class Sh3dRenderBackendTest {
     }
 
     @Test
+    void sunFlowHasNoExposure() {
+        assertFalse(Sh3dRenderBackend.supportsExposure(PhotoRenderer.class));
+    }
+
+    @Test
+    void setExposureSetsAndRestoresProperties() {
+        String low = "x.Y.lowQuality.exposure";
+        String high = "x.Y.highQuality.exposure";
+        System.setProperty(high, "3");
+        try {
+            Runnable restore = Sh3dRenderBackend.setExposure("x.Y", 1.5);
+            assertEquals("1.5", System.getProperty(low));
+            assertEquals("1.5", System.getProperty(high));
+            restore.run();
+            assertNull(System.getProperty(low));
+            assertEquals("3", System.getProperty(high));
+
+            // No exposure overrides the one Sweet Home 3D could have been started with
+            Sh3dRenderBackend.setExposure("x.Y", 0).run();
+            assertEquals("3", System.getProperty(high));
+        } finally {
+            System.clearProperty(low);
+            System.clearProperty(high);
+        }
+    }
+
+    @Test
     void failingToOpenASessionRestoresProperties() {
         System.setProperty(LOW, "keep");
         // An unknown renderer is refused once its parameter was set
         assertThrows(IOException.class,
-                () -> new Sh3dRenderBackend().open(new Home(), "x.Y", Quality.LOW, LightCap.ALL));
+                () -> new Sh3dRenderBackend().open(new Home(), "x.Y", Quality.LOW, LightCap.ALL, 2));
+        assertNull(System.getProperty("x.Y.lowQuality.exposure"));
         assertEquals("keep", System.getProperty(LOW));
         assertNull(System.getProperty(HIGH));
     }

@@ -16,7 +16,7 @@ mkdir -p "$SAMPLE"
 # shellcheck disable=SC2086
 java $SH3D_JAVA_OPTS -cp "$TEST_CP" io.github.valsr.hafloorplan.sample.SampleHomeFactory "$SAMPLE/sample.sh3d"
 
-write_job() {  # write_job <file> <output> <isolateLevel> [<capLight>]
+write_job() {  # write_job <file> <output> <isolateLevel> [<capLight> [<exposure>]]
   cat > "$1" <<JSON
 {
   "version": 1,
@@ -34,7 +34,8 @@ write_job() {  # write_job <file> <output> <isolateLevel> [<capLight>]
   "renderer": "$RENDERER",
   "quality": "LOW",
   "isolateLevel": $3,
-  "capLight": "${4:-off}"
+  "capLight": "${4:-off}",
+  "exposure": ${5:-0}
 }
 JSON
 }
@@ -44,14 +45,16 @@ write_job "$SAMPLE/job-isolated.json" out-isolated true
 scripts/export.sh "$SAMPLE/job.json"
 scripts/export.sh "$SAMPLE/job-isolated.json"
 
-# Only the Blender GPU renderer can stop light with hidden ceilings and levels
+# Only the Blender GPU renderer can stop light with hidden ceilings and levels, and has an exposure setting
 CAPPED_OUTPUTS=()
 if [[ "${RENDERER,,}" == *blender* ]]; then
   write_job "$SAMPLE/job-sun-capped.json" out-sun-capped false sun
   write_job "$SAMPLE/job-capped.json" out-capped false all
   scripts/export.sh "$SAMPLE/job-sun-capped.json"
+  write_job "$SAMPLE/job-exposed.json" out-exposed false all 2
   scripts/export.sh "$SAMPLE/job-capped.json"
-  CAPPED_OUTPUTS=("$SAMPLE/out-sun-capped" "$SAMPLE/out-capped")
+  scripts/export.sh "$SAMPLE/job-exposed.json"
+  CAPPED_OUTPUTS=("$SAMPLE/out-sun-capped" "$SAMPLE/out-capped" "$SAMPLE/out-exposed")
 fi
 
 # shellcheck disable=SC2086

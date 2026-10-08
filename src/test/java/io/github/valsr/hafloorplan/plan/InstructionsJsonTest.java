@@ -160,6 +160,19 @@ class InstructionsJsonTest {
     }
 
     @Test
+    void exposure() {
+        assertEquals(0.0, InstructionsJson.parse(minimal("")).getExposure());
+        Instructions brighter = InstructionsJson.parse(minimal("\"exposure\":1.5"));
+        assertEquals(1.5, brighter.getExposure());
+        assertTrue(InstructionsJson.write(brighter).contains("\"exposure\": 1.5"));
+        assertEquals(brighter, InstructionsJson.parse(InstructionsJson.write(brighter)));
+        assertFalse(brighter.equals(InstructionsJson.parse(minimal(""))));
+        assertEquals(-2.0, InstructionsJson.parse(minimal("\"exposure\":-2")).getExposure());
+        assertOneProblemNaming("exposure", minimal("\"exposure\":\"bright\""));
+        assertOneProblemNaming("exposure", minimal("\"exposure\":50"));
+    }
+
+    @Test
     void reportsAllProblemsTogether() {
         List<String> problems = problems("{\"version\":2,\"floors\":\"*\",\"isolateLevels\":true,\"width\":\"wide\","
                 + "\"times\":{\"start\":\"12:00\",\"end\":\"12:00\",\"intervalMinutes\":60}}");

@@ -368,6 +368,30 @@ class ExporterTest {
     }
 
     @Test
+    void exposureReachesEverySession() throws Exception {
+        this.backend.supportsExposure = true;
+        exporter(config().exposure(1.5).build()).run(null);
+        assertEquals(4, this.backend.sessions.size());
+        for (FakeRenderBackend.Session session : this.backend.sessions) {
+            assertEquals(1.5, session.exposure);
+        }
+        assertTrue(new String(Files.readAllBytes(file("manifest.json").toPath()), StandardCharsets.UTF_8)
+                .contains("\"exposure\": 1.5"));
+    }
+
+    @Test
+    void exposureNeedsASupportingRenderer() throws Exception {
+        ExportException ex = assertThrows(ExportException.class,
+                () -> exporter(config().exposure(-1).build()).run(null));
+        assertEquals(1, ex.getProblems().size());
+        assertTrue(ex.getProblems().get(0).contains("exposure"), ex.getProblems().get(0));
+        assertTrue(this.backend.sessions.isEmpty());
+
+        // No exposure is fine with any renderer
+        assertTrue(exporter(config().exposure(0).build()).run(null));
+    }
+
+    @Test
     void listenerSeesEveryJob() throws Exception {
         List<String> events = new ArrayList<String>();
         exporter(config().build()).run(new ExportListener() {

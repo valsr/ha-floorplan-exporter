@@ -124,6 +124,13 @@ public final class InstructionsResolver {
             capLight = LightCap.OFF;
         }
 
+        double exposure = instructions.getExposure();
+        if (exposure != 0 && renderer != null && !renderer.supportsExposure) {
+            problems.add("exposure needs a renderer with an exposure setting, like a recent Blender GPU renderer;"
+                    + " the installed " + renderer.displayName + " has none");
+            exposure = 0;
+        }
+
         ExportConfig config = ExportConfig.builder()
                 .floors(floors)
                 .dates(instructions.getDates())
@@ -136,6 +143,7 @@ public final class InstructionsResolver {
                 .hideCeilings(instructions.isHideCeilings())
                 .isolateLevel(instructions.isIsolateLevel())
                 .capLight(capLight)
+                .exposure(exposure)
                 .noiseThreshold(instructions.getNoiseThreshold())
                 .outputDir(outputDir)
                 .build();
@@ -224,6 +232,7 @@ public final class InstructionsResolver {
                 .hideCeilings(config.isHideCeilings())
                 .isolateLevel(config.isIsolateLevel())
                 .capLight(config.getCapLight())
+                .exposure(config.getExposure())
                 .noiseThreshold(config.getNoiseThreshold())
                 .build();
     }

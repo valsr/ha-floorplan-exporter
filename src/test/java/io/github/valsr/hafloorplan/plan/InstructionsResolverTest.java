@@ -43,7 +43,7 @@ class InstructionsResolverTest {
                         new HomeSummary.Light("l3", "Desk", "f2")),
                 Arrays.asList(new HomeSummary.Camera("c1", "Top ground"), new HomeSummary.Camera("c2", "Top first")),
                 Arrays.asList(new HomeSummary.Renderer(SUNFLOW, "SunFlow"),
-                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true)));
+                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true, true)));
     }
 
     static Instructions.Builder builder() {
@@ -155,6 +155,21 @@ class InstructionsResolverTest {
 
         assertEquals(LightCap.SUN,
                 InstructionsResolver.toInstructions(blender.getConfig(), summary(), null).getCapLight());
+    }
+
+    @Test
+    void exposureNeedsARendererWithExposure() {
+        InstructionsResolver.Resolution blender = resolve(builder().renderer(BLENDER).exposure(2));
+        assertTrue(blender.getProblems().isEmpty());
+        assertEquals(2.0, blender.getConfig().getExposure());
+        assertEquals(2.0, InstructionsResolver.toInstructions(blender.getConfig(), summary(), null).getExposure());
+
+        InstructionsResolver.Resolution sunFlow = resolve(builder().renderer(SUNFLOW).exposure(2));
+        assertEquals(1, sunFlow.getProblems().size());
+        assertTrue(sunFlow.getProblems().get(0).contains("exposure needs a renderer"), sunFlow.getProblems().get(0));
+        assertEquals(0.0, sunFlow.getConfig().getExposure());
+
+        assertTrue(resolve(builder().renderer(SUNFLOW).exposure(0)).getProblems().isEmpty());
     }
 
     @Test

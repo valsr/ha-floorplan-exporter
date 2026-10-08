@@ -31,7 +31,7 @@ import io.github.valsr.hafloorplan.plan.Json;
 
 /**
  * Checks the exports of the sample home made by <code>scripts/export-sample.sh</code>:
- * SampleAssertions out out-isolated [out-sun-capped out-capped]
+ * SampleAssertions out out-isolated [out-sun-capped out-capped out-exposed]
  */
 public final class SampleAssertions {
     private static final int WIDTH = 320;
@@ -56,6 +56,7 @@ public final class SampleAssertions {
         assertions.checkIsolation(output, isolatedOutput);
         if (args.length > 3) {
             assertions.checkLightCap(output, new File(args [2]), new File(args [3]));
+            assertions.checkExposure(new File(args [3]), new File(args [4]));
         }
         for (String failure : assertions.failures) {
             System.err.println("FAILED: " + failure);
@@ -147,6 +148,20 @@ public final class SampleAssertions {
             check(manifest.contains("\"capLight\": \"" + (cappedFolder == cappedOutput ? "all" : "sun") + "\""),
                     cappedFolder + ": manifest should tell its light cap");
         }
+    }
+
+    /**
+     * Checks that 2 stops of exposure brighten the dark ground floor lit by its window only.
+     */
+    private void checkExposure(File cappedOutput, File exposedOutput) throws Exception {
+        checkExport(exposedOutput);
+        String noon = "ground-floor/base/2026-06-21_1200.png";
+        double capped = brightness(read(cappedOutput, noon));
+        double exposed = brightness(read(exposedOutput, noon));
+        System.out.println("Capped ground floor at noon: " + capped + ", " + exposed + " with 2 stops of exposure");
+        check(exposed > 1.5 * capped, "2 stops of exposure should brighten the capped ground floor");
+        String manifest = new String(Files.readAllBytes(new File(exposedOutput, "manifest.json").toPath()), StandardCharsets.UTF_8);
+        check(manifest.contains("\"exposure\": 2"), exposedOutput + ": manifest should tell its exposure");
     }
 
     private BufferedImage read(File output, String path) throws Exception {

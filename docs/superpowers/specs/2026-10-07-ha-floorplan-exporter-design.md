@@ -651,3 +651,23 @@ the option has two strengths instead of one switch.
 - **Installed renderer.** `scripts/export.sh` prefers the renderer installed
   in `/usr/lib/sweethome3d/gpu-renderer/`; after changing the renderer run
   `sudo make install` there, or point `SH3D_GPU_RENDERER_JAR` at the build.
+
+## 12. Amendment: exposure
+
+The Blender GPU renderer has an `exposure` rendering parameter, in stops. The
+exporter carries it exactly like the light cap (§11.5):
+
+- **Capability**: `HomeSummary.Renderer.supportsExposure`, true if the
+  renderer's bundle has the key `lowQuality.exposure`.
+- **Setting**: `exposure`, a number of stops from -10 to 10, default 0, in
+  `ExportConfig`, `Instructions`, the JSON file and the manifest. The dialog
+  has a spinner (step 0.25), enabled only with a renderer that supports it.
+- **Session**: `RenderBackend.open(…, capLight, exposure)`; the two
+  `<renderer>.<quality>Quality.exposure` system properties are set for the
+  life of the session, whatever the value, and restored afterwards.
+- **Refusal**: a non-zero exposure with a renderer that has none is a
+  resolver problem (command line exits with 2, dialog Load warns) and fails
+  `Exporter` validation.
+- Every image of an export, light renders included, uses the same exposure,
+  so overlays still difference against their night base.
+

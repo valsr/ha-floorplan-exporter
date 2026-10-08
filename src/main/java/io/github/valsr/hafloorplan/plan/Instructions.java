@@ -42,6 +42,7 @@ public final class Instructions {
     private final boolean hideCeilings;
     private final boolean isolateLevel;
     private final LightCap capLight;
+    private final double exposure;
     private final int noiseThreshold;
 
     private Instructions(Builder builder) {
@@ -60,6 +61,7 @@ public final class Instructions {
         this.hideCeilings = builder.hideCeilings;
         this.isolateLevel = builder.isolateLevel;
         this.capLight = builder.capLight;
+        this.exposure = builder.exposure;
         this.noiseThreshold = builder.noiseThreshold;
     }
 
@@ -88,6 +90,7 @@ public final class Instructions {
         builder.hideCeilings = this.hideCeilings;
         builder.isolateLevel = this.isolateLevel;
         builder.capLight = this.capLight;
+        builder.exposure = this.exposure;
         builder.noiseThreshold = this.noiseThreshold;
         return builder;
     }
@@ -169,6 +172,11 @@ public final class Instructions {
         return this.capLight;
     }
 
+    /** Returns the exposure of images in stops, each one doubling their brightness. */
+    public double getExposure() {
+        return this.exposure;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -186,7 +194,8 @@ public final class Instructions {
                 && this.width == other.width && this.height == other.height
                 && Objects.equals(this.renderer, other.renderer) && this.quality == other.quality
                 && this.hideCeilings == other.hideCeilings && this.isolateLevel == other.isolateLevel
-                && this.capLight == other.capLight && this.noiseThreshold == other.noiseThreshold;
+                && this.capLight == other.capLight && this.exposure == other.exposure
+                && this.noiseThreshold == other.noiseThreshold;
     }
 
     @Override
@@ -244,6 +253,7 @@ public final class Instructions {
         private boolean hideCeilings = true;
         private boolean isolateLevel;
         private LightCap capLight = LightCap.OFF;
+        private double exposure;
         private int noiseThreshold = 6;
 
         private Builder() {
@@ -325,6 +335,11 @@ public final class Instructions {
 
         public Builder capLight(LightCap capLight) {
             this.capLight = capLight;
+            return this;
+        }
+
+        public Builder exposure(double exposure) {
+            this.exposure = exposure;
             return this;
         }
 

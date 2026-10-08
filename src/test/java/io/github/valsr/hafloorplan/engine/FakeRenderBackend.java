@@ -50,18 +50,21 @@ public class FakeRenderBackend implements RenderBackend {
     public int failOnRender = -1;
     /** <code>true</code> if the fake renderer claims it can cap light. */
     public boolean supportsLightCap;
+    /** <code>true</code> if the fake renderer claims it has an exposure setting. */
+    public boolean supportsExposure;
     /** Run at the beginning of each render. */
     public Runnable onRender;
     private int renderCount;
 
     @Override
     public List<HomeSummary.Renderer> availableRenderers() {
-        return Arrays.asList(new HomeSummary.Renderer(RENDERER, "Fake", this.supportsLightCap));
+        return Arrays.asList(new HomeSummary.Renderer(RENDERER, "Fake", this.supportsLightCap, this.supportsExposure));
     }
 
     @Override
-    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) {
-        Session session = new Session(home, rendererClassName, quality, capLight);
+    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight,
+                              double exposure) {
+        Session session = new Session(home, rendererClassName, quality, capLight, exposure);
         this.sessions.add(session);
         return session;
     }
@@ -80,6 +83,7 @@ public class FakeRenderBackend implements RenderBackend {
         public final String rendererClassName;
         public final Quality quality;
         public final LightCap capLight;
+        public final double exposure;
         /** Power of each light by name when the session was opened. */
         public final Map<String, Float> lightPowers = new LinkedHashMap<String, Float>();
         /** Visibility of each level by name when the session was opened. */
@@ -92,7 +96,8 @@ public class FakeRenderBackend implements RenderBackend {
         public int closeCount;
         private int litCount;
 
-        Session(Home home, String rendererClassName, Quality quality, LightCap capLight) {
+        Session(Home home, String rendererClassName, Quality quality, LightCap capLight, double exposure) {
+            this.exposure = exposure;
             this.rendererClassName = rendererClassName;
             this.quality = quality;
             this.capLight = capLight;
