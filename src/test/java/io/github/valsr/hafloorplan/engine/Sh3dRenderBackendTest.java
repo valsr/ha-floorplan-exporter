@@ -20,13 +20,19 @@ package io.github.valsr.hafloorplan.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.IOException;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import com.eteks.sweethome3d.j3d.PhotoRenderer;
 
+import com.eteks.sweethome3d.model.Home;
+
 import io.github.valsr.hafloorplan.plan.LightCap;
+import io.github.valsr.hafloorplan.plan.Quality;
 
 class Sh3dRenderBackendTest {
     private static final String LOW = "x.Y.lowQuality.hiddenItemsBlockLight";
@@ -58,6 +64,27 @@ class Sh3dRenderBackendTest {
         assertEquals("sun", System.getProperty(HIGH));
 
         restore.run();
+        assertEquals("keep", System.getProperty(LOW));
+        assertNull(System.getProperty(HIGH));
+    }
+
+    @Test
+    void noCapOverridesAParameterSetElsewhere() {
+        // Sweet Home 3D may have been started with the parameter of the renderer set
+        System.setProperty(LOW, "sun");
+        Runnable restore = Sh3dRenderBackend.setLightCap("x.Y", LightCap.OFF);
+        assertEquals("false", System.getProperty(LOW));
+        assertEquals("false", System.getProperty(HIGH));
+        restore.run();
+        assertEquals("sun", System.getProperty(LOW));
+    }
+
+    @Test
+    void failingToOpenASessionRestoresProperties() {
+        System.setProperty(LOW, "keep");
+        // An unknown renderer is refused once its parameter was set
+        assertThrows(IOException.class,
+                () -> new Sh3dRenderBackend().open(new Home(), "x.Y", Quality.LOW, LightCap.ALL));
         assertEquals("keep", System.getProperty(LOW));
         assertNull(System.getProperty(HIGH));
     }

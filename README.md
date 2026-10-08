@@ -150,6 +150,10 @@ older one the choice is disabled in the dialog and refused on the command line. 
 not viewable in Sweet Home 3D are never rendered, so they don't block light either: make a roof
 level viewable if it should stop the sun.
 
+Every room of the exported floor is capped at its ceiling height, including the rooms whose ceiling
+is switched off in the home itself. A terrace or another room open to the sky drawn on that floor is
+therefore shaded too.
+
 ## Development
 
     scripts/test.sh                                  # unit tests (downloads the JUnit console jar into lib/)

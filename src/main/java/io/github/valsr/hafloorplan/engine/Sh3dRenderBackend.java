@@ -109,25 +109,25 @@ public final class Sh3dRenderBackend implements RenderBackend {
 
     @Override
     public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) throws IOException {
-        // Kept for the whole session because a renderer may read its parameters when it renders its first image
-        final Runnable restoreLightCap = capLight != LightCap.OFF
-                ? setLightCap(rendererClassName, capLight)
-                : null;
-        final AbstractPhotoRenderer renderer;
+        // Set whatever the cap is, to override a parameter Sweet Home 3D could have been started with, and kept
+        // for the whole session because a renderer may read its parameters when it renders its first image
+        final Runnable restoreLightCap = setLightCap(rendererClassName, capLight);
+        AbstractPhotoRenderer openedRenderer = null;
         try {
-            renderer = AbstractPhotoRenderer.createInstance(
+            AbstractPhotoRenderer createdRenderer = AbstractPhotoRenderer.createInstance(
                     rendererClassName, home, null, AbstractPhotoRenderer.Quality.valueOf(quality.name()));
-            if (!renderer.getClass().getName().equals(rendererClassName)) {
-                renderer.dispose();
+            if (!createdRenderer.getClass().getName().equals(rendererClassName)) {
+                createdRenderer.dispose();
                 throw new IOException("Renderer " + rendererClassName + " is not available");
             }
-        } catch (IOException ex) {
-            restore(restoreLightCap);
-            throw ex;
-        } catch (RuntimeException ex) {
-            restore(restoreLightCap);
-            throw ex;
+            openedRenderer = createdRenderer;
+        } finally {
+            if (openedRenderer == null) {
+                // Whatever failed, Sweet Home 3D's own photo dialog mustn't inherit the parameter
+                restoreLightCap.run();
+            }
         }
+        final AbstractPhotoRenderer renderer = openedRenderer;
         return new RenderSession() {
             @Override
             public BufferedImage render(Camera camera, int width, int height) throws IOException {
@@ -146,16 +146,9 @@ public final class Sh3dRenderBackend implements RenderBackend {
                 try {
                     renderer.dispose();
                 } finally {
-                    // Sweet Home 3D's own photo dialog mustn't inherit the parameter
-                    restore(restoreLightCap);
+                    restoreLightCap.run();
                 }
             }
         };
-    }
-
-    private static void restore(Runnable restoreLightCap) {
-        if (restoreLightCap != null) {
-            restoreLightCap.run();
-        }
     }
 }
