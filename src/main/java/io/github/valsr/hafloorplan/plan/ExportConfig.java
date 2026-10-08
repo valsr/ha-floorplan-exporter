@@ -38,6 +38,7 @@ public final class ExportConfig {
     private final boolean hideCeilings;
     private final boolean isolateLevel;
     private final LightCap capLight;
+    private final double exposure;
     private final int noiseThreshold;
     private final File outputDir;
 
@@ -53,6 +54,7 @@ public final class ExportConfig {
         this.hideCeilings = builder.hideCeilings;
         this.isolateLevel = builder.isolateLevel;
         this.capLight = builder.capLight;
+        this.exposure = builder.exposure;
         this.noiseThreshold = builder.noiseThreshold;
         this.outputDir = builder.outputDir;
     }
@@ -107,6 +109,11 @@ public final class ExportConfig {
         return this.capLight;
     }
 
+    /** Returns the exposure of images in stops, each one doubling their brightness. */
+    public double getExposure() {
+        return this.exposure;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -153,6 +160,7 @@ public final class ExportConfig {
         private boolean hideCeilings = true;
         private boolean isolateLevel;
         private LightCap capLight = LightCap.OFF;
+        private double exposure;
         private int noiseThreshold = 6;
         private File outputDir;
 
@@ -211,6 +219,11 @@ public final class ExportConfig {
 
         public Builder capLight(LightCap capLight) {
             this.capLight = capLight;
+            return this;
+        }
+
+        public Builder exposure(double exposure) {
+            this.exposure = exposure;
             return this;
         }
 

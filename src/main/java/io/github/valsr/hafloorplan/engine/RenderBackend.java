@@ -40,6 +40,9 @@ public interface RenderBackend {
      * @param capLight what the ceilings and levels hidden in <code>home</code> still block without being seen;
      *     only renderers with {@link HomeSummary.Renderer#supportsLightCap} accept another value than
      *     {@link LightCap#OFF}
+     * @param exposure the exposure of images in stops, each one doubling their brightness; only renderers with
+     *     {@link HomeSummary.Renderer#supportsExposure} accept another value than 0
      */
-    RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) throws IOException;
+    RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight,
+                       double exposure) throws IOException;
 }

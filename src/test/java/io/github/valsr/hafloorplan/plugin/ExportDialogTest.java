@@ -67,7 +67,7 @@ class ExportDialogTest {
                         new HomeSummary.Light("l3", "Desk", "f2")),
                 Arrays.asList(new HomeSummary.Camera("c1", "Top ground"), new HomeSummary.Camera("c2", "Top first")),
                 Arrays.asList(new HomeSummary.Renderer(SUNFLOW, "SunFlow"),
-                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true)));
+                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true, true)));
     }
 
     private static ExportDialog dialog() {
@@ -231,6 +231,38 @@ class ExportDialogTest {
                 config().rendererClassName(SUNFLOW).capLight(LightCap.ALL).build(), summary(), null));
         assertEquals(1, dialog.getLoadWarnings().size(), dialog.getLoadWarnings().toString());
         assertEquals(LightCap.OFF, dialog.getInstructions().getCapLight());
+    }
+
+    @Test
+    void exposureFollowsTheRenderer() {
+        ExportDialog dialog = dialog();
+        // SunFlow, selected first, has no exposure setting
+        assertFalse(dialog.exposureSpinner.isEnabled());
+        assertEquals(0.0, dialog.getInstructions().getExposure());
+
+        Instructions instructions = InstructionsResolver.toInstructions(
+                config().exposure(1.5).build(), summary(), HOME_FILE.getAbsolutePath());
+        dialog.setInstructions(instructions);
+        assertTrue(dialog.getLoadWarnings().isEmpty());
+        assertTrue(dialog.exposureSpinner.isEnabled());
+        assertEquals(1.5, dialog.getInstructions().getExposure());
+        assertEquals(instructions, dialog.getInstructions());
+
+        dialog.exposureSpinner.setValue(-0.5);
+        assertEquals(-0.5, dialog.getInstructions().getExposure());
+
+        dialog.rendererComboBox.setSelectedIndex(0);
+        assertFalse(dialog.exposureSpinner.isEnabled());
+        assertEquals(0.0, dialog.getInstructions().getExposure());
+    }
+
+    @Test
+    void exposureDroppedWithAnotherRenderer() {
+        ExportDialog dialog = dialog();
+        dialog.setInstructions(InstructionsResolver.toInstructions(
+                config().rendererClassName(SUNFLOW).exposure(2).build(), summary(), null));
+        assertEquals(1, dialog.getLoadWarnings().size(), dialog.getLoadWarnings().toString());
+        assertEquals(0.0, dialog.getInstructions().getExposure());
     }
 
     @Test

@@ -33,7 +33,8 @@ import java.util.Map;
 public final class InstructionsJson {
     private static final int VERSION = 1;
     private static final List<String> KEYS = Arrays.asList("version", "home", "output", "floors", "dates", "times",
-            "lights", "width", "height", "renderer", "quality", "hideCeilings", "isolateLevel", "capLight", "noiseThreshold");
+            "lights", "width", "height", "renderer", "quality", "hideCeilings", "isolateLevel", "capLight", "exposure", "noiseThreshold");
+    private static final double MAX_EXPOSURE = 10;
     private static final String ALL = "*";
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -107,6 +108,15 @@ public final class InstructionsJson {
                 builder.capLight(capLight);
             } else {
                 this.problems.add("\"capLight\" must be \"off\", \"sun\" or \"all\"");
+            }
+        }
+        if (object.containsKey("exposure")) {
+            Object exposure = object.get("exposure");
+            if (exposure instanceof Double && Math.abs((Double)exposure) <= MAX_EXPOSURE) {
+                builder.exposure((Double)exposure);
+            } else {
+                this.problems.add("\"exposure\" must be a number of stops from -" + (int)MAX_EXPOSURE
+                        + " to " + (int)MAX_EXPOSURE);
             }
         }
         Integer noiseThreshold = readInteger(object, "noiseThreshold", 6, 0, 255);
@@ -344,6 +354,7 @@ public final class InstructionsJson {
         object.put("hideCeilings", instructions.isHideCeilings());
         object.put("isolateLevel", instructions.isIsolateLevel());
         object.put("capLight", instructions.getCapLight().toText());
+        object.put("exposure", instructions.getExposure());
         object.put("noiseThreshold", instructions.getNoiseThreshold());
         return Json.write(object);
     }

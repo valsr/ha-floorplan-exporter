@@ -157,7 +157,7 @@ public final class Exporter {
                         camera = scene.camera(getCameraId(floorId));
                     }
                     scene.setLights(job.lightId);
-                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), this.config.getCapLight());
+                    this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), this.config.getCapLight(), this.config.getExposure());
                     if (this.cancelled) {
                         // Cancelled while the session was opening
                         return false;
@@ -270,6 +270,9 @@ public final class Exporter {
         HomeSummary.Renderer renderer = summary.renderer(this.config.getRendererClassName());
         if (this.config.getCapLight() != LightCap.OFF && renderer != null && !renderer.supportsLightCap) {
             problems.add("Renderer " + renderer.displayName + " cannot block light through hidden ceilings and levels");
+        }
+        if (this.config.getExposure() != 0 && renderer != null && !renderer.supportsExposure) {
+            problems.add("Renderer " + renderer.displayName + " has no exposure setting");
         }
         File outputDir = this.config.getOutputDir();
         if (outputDir == null) {

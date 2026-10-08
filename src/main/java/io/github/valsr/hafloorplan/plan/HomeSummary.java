@@ -143,6 +143,8 @@ public final class HomeSummary {
         public final String displayName;
         /** <code>true</code> if the renderer can keep hidden ceilings and levels as invisible light blockers. */
         public final boolean supportsLightCap;
+        /** <code>true</code> if the exposure of the images of the renderer can be set. */
+        public final boolean supportsExposure;
 
         /**
          * Creates a renderer unable to cap light.
@@ -151,10 +153,18 @@ public final class HomeSummary {
             this(className, displayName, false);
         }
 
+        /**
+         * Creates a renderer without exposure setting.
+         */
         public Renderer(String className, String displayName, boolean supportsLightCap) {
+            this(className, displayName, supportsLightCap, false);
+        }
+
+        public Renderer(String className, String displayName, boolean supportsLightCap, boolean supportsExposure) {
             this.className = className;
             this.displayName = displayName;
             this.supportsLightCap = supportsLightCap;
+            this.supportsExposure = supportsExposure;
         }
     }
 }

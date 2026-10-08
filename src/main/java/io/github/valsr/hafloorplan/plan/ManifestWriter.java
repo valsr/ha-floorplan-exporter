@@ -54,6 +54,7 @@ public final class ManifestWriter {
         manifest.put("hideCeilings", config.isHideCeilings());
         manifest.put("isolateLevel", config.isIsolateLevel());
         manifest.put("capLight", config.getCapLight().toText());
+        manifest.put("exposure", config.getExposure());
         List<Object> dates = new ArrayList<Object>();
         for (LocalDate date : config.getDates().dates()) {
             dates.add(date.toString());
