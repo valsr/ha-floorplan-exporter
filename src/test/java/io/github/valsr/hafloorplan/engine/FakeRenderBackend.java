@@ -35,6 +35,7 @@ import com.eteks.sweethome3d.model.Level;
 import com.eteks.sweethome3d.model.Room;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 
 /**
@@ -47,18 +48,20 @@ public class FakeRenderBackend implements RenderBackend {
     public final List<Session> sessions = new ArrayList<Session>();
     /** Index, among all renders, of the one that throws an exception, or -1. */
     public int failOnRender = -1;
+    /** <code>true</code> if the fake renderer claims it can cap light. */
+    public boolean supportsLightCap;
     /** Run at the beginning of each render. */
     public Runnable onRender;
     private int renderCount;
 
     @Override
     public List<HomeSummary.Renderer> availableRenderers() {
-        return Arrays.asList(new HomeSummary.Renderer(RENDERER, "Fake"));
+        return Arrays.asList(new HomeSummary.Renderer(RENDERER, "Fake", this.supportsLightCap));
     }
 
     @Override
-    public RenderSession open(Home home, String rendererClassName, Quality quality) {
-        Session session = new Session(home, rendererClassName, quality);
+    public RenderSession open(Home home, String rendererClassName, Quality quality, LightCap capLight) {
+        Session session = new Session(home, rendererClassName, quality, capLight);
         this.sessions.add(session);
         return session;
     }
@@ -76,6 +79,7 @@ public class FakeRenderBackend implements RenderBackend {
     public class Session implements RenderSession {
         public final String rendererClassName;
         public final Quality quality;
+        public final LightCap capLight;
         /** Power of each light by name when the session was opened. */
         public final Map<String, Float> lightPowers = new LinkedHashMap<String, Float>();
         /** Visibility of each level by name when the session was opened. */
@@ -88,9 +92,10 @@ public class FakeRenderBackend implements RenderBackend {
         public int closeCount;
         private int litCount;
 
-        Session(Home home, String rendererClassName, Quality quality) {
+        Session(Home home, String rendererClassName, Quality quality, LightCap capLight) {
             this.rendererClassName = rendererClassName;
             this.quality = quality;
+            this.capLight = capLight;
             List<HomeLight> lights = new ArrayList<HomeLight>();
             addLights(home.getFurniture(), lights);
             for (HomeLight light : lights) {

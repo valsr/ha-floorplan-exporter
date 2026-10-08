@@ -115,6 +115,15 @@ public final class InstructionsResolver {
             }
         }
 
+        String rendererClassName = findRenderer(instructions.getRenderer(), summary, problems);
+        LightCap capLight = instructions.getCapLight();
+        HomeSummary.Renderer renderer = summary.renderer(rendererClassName);
+        if (capLight != LightCap.OFF && renderer != null && !renderer.supportsLightCap) {
+            problems.add("capLight needs a renderer that can hide objects from the camera only, like a recent Blender GPU"
+                    + " renderer; the installed " + renderer.displayName + " cannot");
+            capLight = LightCap.OFF;
+        }
+
         ExportConfig config = ExportConfig.builder()
                 .floors(floors)
                 .dates(instructions.getDates())
@@ -122,10 +131,11 @@ public final class InstructionsResolver {
                 .lightIds(lightIds)
                 .width(instructions.getWidth())
                 .height(instructions.getHeight())
-                .rendererClassName(findRenderer(instructions.getRenderer(), summary, problems))
+                .rendererClassName(rendererClassName)
                 .quality(instructions.getQuality())
                 .hideCeilings(instructions.isHideCeilings())
                 .isolateLevel(instructions.isIsolateLevel())
+                .capLight(capLight)
                 .noiseThreshold(instructions.getNoiseThreshold())
                 .outputDir(outputDir)
                 .build();
@@ -213,6 +223,7 @@ public final class InstructionsResolver {
                 .quality(config.getQuality())
                 .hideCeilings(config.isHideCeilings())
                 .isolateLevel(config.isIsolateLevel())
+                .capLight(config.getCapLight())
                 .noiseThreshold(config.getNoiseThreshold())
                 .build();
     }

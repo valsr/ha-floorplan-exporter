@@ -72,6 +72,7 @@ import io.github.valsr.hafloorplan.plan.Instructions;
 import io.github.valsr.hafloorplan.plan.InstructionsException;
 import io.github.valsr.hafloorplan.plan.InstructionsJson;
 import io.github.valsr.hafloorplan.plan.InstructionsResolver;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.Quality;
 import io.github.valsr.hafloorplan.plan.Ref;
 import io.github.valsr.hafloorplan.plan.RenderJob;
@@ -102,11 +103,15 @@ class ExportDialog extends JDialog {
     final JButton noLightsButton = new JButton(MESSAGES.getString("lights.none"));
     private final JSpinner widthSpinner = new JSpinner(new SpinnerNumberModel(1920, 1, 16384, 10));
     private final JSpinner heightSpinner = new JSpinner(new SpinnerNumberModel(1080, 1, 16384, 10));
-    private final JComboBox<Item> rendererComboBox = new JComboBox<Item>();
+    final JComboBox<Item> rendererComboBox = new JComboBox<Item>();
     private final JComboBox<String> qualityComboBox = new JComboBox<String>(new String [] {
             MESSAGES.getString("options.quality.low"), MESSAGES.getString("options.quality.high")});
     private final JCheckBox hideCeilingsCheckBox = new JCheckBox(MESSAGES.getString("options.hideCeilings"), true);
     final JCheckBox isolateCheckBox = new JCheckBox(MESSAGES.getString("options.isolateLevel"));
+    /** Choices in the order of the values of {@link LightCap}. */
+    final JComboBox<String> capLightComboBox = new JComboBox<String>(new String [] {
+            MESSAGES.getString("options.capLight.off"), MESSAGES.getString("options.capLight.sun"),
+            MESSAGES.getString("options.capLight.all")});
     final JTextField outputField = new JTextField(30);
     private final JLabel summaryLabel = new JLabel(" ");
     private final JLabel errorLabel = new JLabel(" ");
@@ -222,6 +227,10 @@ class ExportDialog extends JDialog {
         optionsPanel.add(this.hideCeilingsCheckBox, constraints);
         constraints.gridy++;
         optionsPanel.add(this.isolateCheckBox, constraints);
+        constraints.gridy++;
+        optionsPanel.add(new JLabel(MESSAGES.getString("options.capLight")), constraints);
+        constraints.gridy++;
+        optionsPanel.add(this.capLightComboBox, constraints);
 
         JButton browseButton = new JButton(MESSAGES.getString("output.browse"));
         browseButton.addActionListener(new ActionListener() {
@@ -340,6 +349,7 @@ class ExportDialog extends JDialog {
                                                   this.startTimeField, this.endTimeField, this.outputField}) {
             field.getDocument().addDocumentListener(documentListener);
         }
+        this.rendererComboBox.addActionListener(actionListener);
         this.dateIntervalSpinner.addChangeListener(changeListener);
         this.timeIntervalSpinner.addChangeListener(changeListener);
 
@@ -496,8 +506,20 @@ class ExportDialog extends JDialog {
                 .quality(this.qualityComboBox.getSelectedIndex() == 1 ? Quality.HIGH : Quality.LOW)
                 .hideCeilings(this.hideCeilingsCheckBox.isSelected())
                 .isolateLevel(this.isolateCheckBox.isEnabled() && this.isolateCheckBox.isSelected())
+                .capLight(isLightCapSupported()
+                        ? LightCap.values() [this.capLightComboBox.getSelectedIndex()]
+                        : LightCap.OFF)
                 .noiseThreshold(this.noiseThreshold)
                 .build();
+    }
+
+    /**
+     * Returns <code>true</code> if the selected renderer can hide objects from the camera only.
+     */
+    private boolean isLightCapSupported() {
+        Item rendererItem = (Item)this.rendererComboBox.getSelectedItem();
+        HomeSummary.Renderer renderer = rendererItem != null ? this.summary.renderer(rendererItem.id) : null;
+        return renderer != null && renderer.supportsLightCap;
     }
 
     private static LocalDate parseDate(JTextField field, String errorKey, List<String> errors) {
@@ -555,6 +577,7 @@ class ExportDialog extends JDialog {
             this.qualityComboBox.setSelectedIndex(config.getQuality() == Quality.HIGH ? 1 : 0);
             this.hideCeilingsCheckBox.setSelected(config.isHideCeilings());
             this.isolateCheckBox.setSelected(config.isIsolateLevel());
+            this.capLightComboBox.setSelectedIndex(config.getCapLight().ordinal());
             this.noiseThreshold = config.getNoiseThreshold();
             this.outputField.setText(config.getOutputDir() != null ? config.getOutputDir().getPath() : "");
         } finally {
@@ -607,6 +630,10 @@ class ExportDialog extends JDialog {
         for (FloorRow row : this.floorRows) {
             row.cameraComboBox.setEnabled(row.checkBox.isSelected());
         }
+        boolean lightCapSupported = isLightCapSupported();
+        this.capLightComboBox.setEnabled(lightCapSupported);
+        this.capLightComboBox.setToolTipText(MESSAGES.getString(
+                lightCapSupported ? "options.capLight.tooltip" : "options.capLight.unavailable"));
         List<String> errors = getValidationErrors();
         this.errorLabel.setText(errors.isEmpty() ? " " : errors.get(0));
         String summaryText = getSummaryText();

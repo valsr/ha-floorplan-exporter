@@ -147,6 +147,19 @@ class InstructionsJsonTest {
     }
 
     @Test
+    void capLight() {
+        assertEquals(LightCap.OFF, InstructionsJson.parse(minimal("")).getCapLight());
+        assertEquals(LightCap.SUN, InstructionsJson.parse(minimal("\"capLight\":\"sun\"")).getCapLight());
+        Instructions all = InstructionsJson.parse(minimal("\"capLight\":\"all\""));
+        assertEquals(LightCap.ALL, all.getCapLight());
+        assertTrue(InstructionsJson.write(all).contains("\"capLight\": \"all\""));
+        assertEquals(all, InstructionsJson.parse(InstructionsJson.write(all)));
+        assertFalse(all.equals(InstructionsJson.parse(minimal(""))));
+        assertOneProblemNaming("capLight", minimal("\"capLight\":true"));
+        assertOneProblemNaming("capLight", minimal("\"capLight\":\"moon\""));
+    }
+
+    @Test
     void reportsAllProblemsTogether() {
         List<String> problems = problems("{\"version\":2,\"floors\":\"*\",\"isolateLevels\":true,\"width\":\"wide\","
                 + "\"times\":{\"start\":\"12:00\",\"end\":\"12:00\",\"intervalMinutes\":60}}");

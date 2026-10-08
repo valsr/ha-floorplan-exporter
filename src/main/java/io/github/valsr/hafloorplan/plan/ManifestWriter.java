@@ -53,6 +53,7 @@ public final class ManifestWriter {
         manifest.put("quality", config.getQuality().name());
         manifest.put("hideCeilings", config.isHideCeilings());
         manifest.put("isolateLevel", config.isIsolateLevel());
+        manifest.put("capLight", config.getCapLight().toText());
         List<Object> dates = new ArrayList<Object>();
         for (LocalDate date : config.getDates().dates()) {
             dates.add(date.toString());

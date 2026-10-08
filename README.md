@@ -58,6 +58,11 @@ Restart Sweet Home 3D; **Tools > Export for HA Floorplan…** appears.
   from above.
 - **Hide other levels** renders each floor alone. When off, a floor is rendered with the levels
   under it, as Sweet Home 3D shows it.
+- **Light through hidden ceilings and levels** (Blender GPU renderer only) decides what the parts
+  hidden to see the floor still do to light. *Not blocked*: light falls into the rooms from above.
+  *Block direct sun*: the sun comes in only through windows and openings, while the light of the sky
+  still reaches the rooms. *Block all light*: rooms are lit only through their windows and by their
+  lamps, so a room without either is dark.
 - **Renderer** lists the photo renderers Sweet Home 3D has available, at its two ray-traced
   quality levels.
 
@@ -102,6 +107,7 @@ by name and lists the rest.
   "quality": "LOW",
   "hideCeilings": true,
   "isolateLevel": false,
+  "capLight": "sun",
   "noiseThreshold": 6
 }
 ```
@@ -120,6 +126,7 @@ by name and lists the rest.
 | `quality` | no | `"LOW"` | `"LOW"` or `"HIGH"` |
 | `hideCeilings` | no | `true` | |
 | `isolateLevel` | no | `false` | Render each floor without the other levels |
+| `capLight` | no | `"off"` | What hidden ceilings and levels still block: `"off"`, `"sun"` (direct sun only) or `"all"`. Needs the Blender GPU renderer |
 | `noiseThreshold` | no | `6` | Brightening, from 0 to 255, under which a pixel is left out of a light overlay |
 
 A level, a point of view or a light is written as its name, or as `{"id": …, "name": …}`, the
@@ -137,6 +144,15 @@ project's README explains. For the command line, `scripts/export.sh` adds the ag
 3. `../gpu-renderer/build/gpu-renderer.jar` beside this repository.
 
 Blender is started once per floor for all its base images, then once per light.
+
+The light cap needs a version of the renderer with the `hiddenItemsBlockLight` parameter. With an
+older one the choice is disabled in the dialog and refused on the command line. Levels marked as
+not viewable in Sweet Home 3D are never rendered, so they don't block light either: make a roof
+level viewable if it should stop the sun.
+
+Every room of the exported floor is capped at its ceiling height, including the rooms whose ceiling
+is switched off in the home itself. A terrace or another room open to the sky drawn on that floor is
+therefore shaded too.
 
 ## Development
 

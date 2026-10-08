@@ -43,7 +43,7 @@ class InstructionsResolverTest {
                         new HomeSummary.Light("l3", "Desk", "f2")),
                 Arrays.asList(new HomeSummary.Camera("c1", "Top ground"), new HomeSummary.Camera("c2", "Top first")),
                 Arrays.asList(new HomeSummary.Renderer(SUNFLOW, "SunFlow"),
-                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)")));
+                        new HomeSummary.Renderer(BLENDER, "Blender Cycles (GPU)", true)));
     }
 
     static Instructions.Builder builder() {
@@ -139,6 +139,22 @@ class InstructionsResolverTest {
         InstructionsResolver.Resolution unknown = resolve(builder().renderer("Nope"));
         assertEquals(1, unknown.getProblems().size());
         assertEquals(SUNFLOW, unknown.getConfig().getRendererClassName());
+    }
+
+    @Test
+    void capLightNeedsARendererAbleToCap() {
+        InstructionsResolver.Resolution blender = resolve(builder().renderer(BLENDER).capLight(LightCap.SUN));
+        assertTrue(blender.getProblems().isEmpty());
+        assertEquals(LightCap.SUN, blender.getConfig().getCapLight());
+
+        InstructionsResolver.Resolution sunFlow = resolve(builder().renderer(SUNFLOW).capLight(LightCap.ALL));
+        assertEquals(1, sunFlow.getProblems().size());
+        assertTrue(sunFlow.getProblems().get(0).contains("capLight needs a renderer"), sunFlow.getProblems().get(0));
+        assertTrue(sunFlow.getProblems().get(0).contains("SunFlow"), sunFlow.getProblems().get(0));
+        assertEquals(LightCap.OFF, sunFlow.getConfig().getCapLight());
+
+        assertEquals(LightCap.SUN,
+                InstructionsResolver.toInstructions(blender.getConfig(), summary(), null).getCapLight());
     }
 
     @Test

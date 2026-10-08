@@ -53,6 +53,7 @@ import io.github.valsr.hafloorplan.plan.ExportPlan;
 import io.github.valsr.hafloorplan.plan.ExportPlanner;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.Json;
+import io.github.valsr.hafloorplan.plan.LightCap;
 import io.github.valsr.hafloorplan.plan.RenderJob;
 import io.github.valsr.hafloorplan.plan.TimeSchedule;
 
@@ -339,6 +340,31 @@ class ExporterTest {
         Map<?, ?> skipped = (Map<?, ?>)((List<?>)((Map<?, ?>)Json.parse(manifest)).get("skippedLights")).get(0);
         assertEquals("Unlit", skipped.get("name"));
         assertEquals("off", skipped.get("reason"));
+    }
+
+    @Test
+    void capLightReachesEverySession() throws Exception {
+        this.backend.supportsLightCap = true;
+        exporter(config().capLight(LightCap.SUN).build()).run(null);
+        assertEquals(4, this.backend.sessions.size());
+        for (FakeRenderBackend.Session session : this.backend.sessions) {
+            assertEquals(LightCap.SUN, session.capLight);
+        }
+        assertTrue(new String(Files.readAllBytes(file("manifest.json").toPath()), StandardCharsets.UTF_8)
+                .contains("\"capLight\": \"sun\""));
+
+        this.backend.sessions.clear();
+        exporter(config().build()).run(null);
+        assertEquals(LightCap.OFF, this.backend.sessions.get(0).capLight);
+    }
+
+    @Test
+    void capLightNeedsASupportingRenderer() {
+        ExportException ex = assertThrows(ExportException.class,
+                () -> exporter(config().capLight(LightCap.ALL).build()).run(null));
+        assertEquals(1, ex.getProblems().size());
+        assertTrue(ex.getProblems().get(0).contains("cannot block light"), ex.getProblems().get(0));
+        assertTrue(this.backend.sessions.isEmpty());
     }
 
     @Test

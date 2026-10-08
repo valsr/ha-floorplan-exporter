@@ -37,6 +37,7 @@ public final class ExportConfig {
     private final Quality quality;
     private final boolean hideCeilings;
     private final boolean isolateLevel;
+    private final LightCap capLight;
     private final int noiseThreshold;
     private final File outputDir;
 
@@ -51,6 +52,7 @@ public final class ExportConfig {
         this.quality = builder.quality;
         this.hideCeilings = builder.hideCeilings;
         this.isolateLevel = builder.isolateLevel;
+        this.capLight = builder.capLight;
         this.noiseThreshold = builder.noiseThreshold;
         this.outputDir = builder.outputDir;
     }
@@ -100,6 +102,11 @@ public final class ExportConfig {
         return this.isolateLevel;
     }
 
+    /** Returns what hidden ceilings and levels still block. */
+    public LightCap getCapLight() {
+        return this.capLight;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -145,6 +152,7 @@ public final class ExportConfig {
         private Quality quality = Quality.LOW;
         private boolean hideCeilings = true;
         private boolean isolateLevel;
+        private LightCap capLight = LightCap.OFF;
         private int noiseThreshold = 6;
         private File outputDir;
 
@@ -198,6 +206,11 @@ public final class ExportConfig {
 
         public Builder isolateLevel(boolean isolateLevel) {
             this.isolateLevel = isolateLevel;
+            return this;
+        }
+
+        public Builder capLight(LightCap capLight) {
+            this.capLight = capLight;
             return this;
         }
 

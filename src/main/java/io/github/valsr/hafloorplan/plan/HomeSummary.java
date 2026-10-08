@@ -141,10 +141,20 @@ public final class HomeSummary {
     public static final class Renderer {
         public final String className;
         public final String displayName;
+        /** <code>true</code> if the renderer can keep hidden ceilings and levels as invisible light blockers. */
+        public final boolean supportsLightCap;
 
+        /**
+         * Creates a renderer unable to cap light.
+         */
         public Renderer(String className, String displayName) {
+            this(className, displayName, false);
+        }
+
+        public Renderer(String className, String displayName, boolean supportsLightCap) {
             this.className = className;
             this.displayName = displayName;
+            this.supportsLightCap = supportsLightCap;
         }
     }
 }
