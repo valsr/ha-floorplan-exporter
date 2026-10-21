@@ -20,7 +20,8 @@ package io.github.valsr.hafloorplan.plan;
 import java.util.Locale;
 
 /**
- * What the ceilings and levels hidden to see a floor from above still block, without being seen.
+ * What the ceilings hidden to see a floor from above still block, without being seen.
+ * Hidden levels block nothing, so light still reaches the levels under the floor.
  */
 public enum LightCap {
     /** Nothing: light falls in the floor from where the camera looks. */

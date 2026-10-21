@@ -128,7 +128,7 @@ public final class SampleAssertions {
     }
 
     /**
-     * Checks that hidden ceilings and levels darken the ground floor at noon when they stop the sun,
+     * Checks that hidden ceilings darken the ground floor at noon when they stop the sun,
      * more when they stop all light, without hiding the floor from the camera.
      */
     private void checkLightCap(File output, File sunCappedOutput, File cappedOutput) throws Exception {
