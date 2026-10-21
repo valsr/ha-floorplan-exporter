@@ -429,7 +429,7 @@ errors, so a misspelt key is reported rather than silently ignored.
 
 ```json
 {
-  "generator": "ha-floorplan-exporter 0.1.0",
+  "generator": "ha-floorplan-exporter 0.2.0",
   "width": 1920, "height": 1080,
   "renderer": "sh3d.gpurenderer.BlenderRenderer",
   "rendererName": "Blender Cycles (GPU)", "quality": "LOW",
