@@ -152,7 +152,7 @@ class HeadlessExportTest {
         assertEquals("[6/6] first-floor/lights/desk.png", lines [5]);
         assertTrue(path("out/manifest.json").isFile());
         assertTrue(new String(Files.readAllBytes(path("out/manifest.json").toPath()), StandardCharsets.UTF_8)
-                .contains("\"generator\": \"ha-floorplan-exporter 0.1.0\""));
+                .contains("\"generator\": \"ha-floorplan-exporter 0.2.0\""));
     }
 
     @Test

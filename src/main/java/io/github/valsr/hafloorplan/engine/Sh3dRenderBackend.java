@@ -40,7 +40,7 @@ import io.github.valsr.hafloorplan.plan.Quality;
  * like the Blender GPU renderer once its Java agent is loaded.
  */
 public final class Sh3dRenderBackend implements RenderBackend {
-    /** Rendering parameter telling a renderer what the ceilings and levels hidden in a home still block. */
+    /** Rendering parameter telling a renderer what the ceilings hidden at the selected level of a home still block. */
     private static final String LIGHT_CAP_PARAMETER = "hiddenItemsBlockLight";
     /** Rendering parameter giving the exposure of images in stops. */
     private static final String EXPOSURE_PARAMETER = "exposure";

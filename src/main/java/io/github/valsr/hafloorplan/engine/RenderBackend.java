@@ -37,7 +37,7 @@ public interface RenderBackend {
 
     /**
      * Returns a session rendering <code>home</code> in its current state.
-     * @param capLight what the ceilings and levels hidden in <code>home</code> still block without being seen;
+     * @param capLight what the ceilings hidden at the selected level of <code>home</code> still block without being seen;
      *     only renderers with {@link HomeSummary.Renderer#supportsLightCap} accept another value than
      *     {@link LightCap#OFF}
      * @param exposure the exposure of images in stops, each one doubling their brightness; only renderers with

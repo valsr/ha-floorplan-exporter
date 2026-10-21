@@ -269,7 +269,7 @@ public final class Exporter {
         }
         HomeSummary.Renderer renderer = summary.renderer(this.config.getRendererClassName());
         if (this.config.getCapLight() != LightCap.OFF && renderer != null && !renderer.supportsLightCap) {
-            problems.add("Renderer " + renderer.displayName + " cannot block light through hidden ceilings and levels");
+            problems.add("Renderer " + renderer.displayName + " cannot block light through hidden ceilings");
         }
         if (this.config.getExposure() != 0 && renderer != null && !renderer.supportsExposure) {
             problems.add("Renderer " + renderer.displayName + " has no exposure setting");

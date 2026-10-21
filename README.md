@@ -58,8 +58,10 @@ Restart Sweet Home 3D; **Tools > Export for HA Floorplan…** appears.
   from above.
 - **Hide other levels** renders each floor alone. When off, a floor is rendered with the levels
   under it, as Sweet Home 3D shows it.
-- **Light through hidden ceilings and levels** (Blender GPU renderer only) decides what the parts
-  hidden to see the floor still do to light. *Not blocked*: light falls into the rooms from above.
+- **Light through hidden ceilings** (Blender GPU renderer only) decides what the ceilings of the
+  rendered floor, hidden to see it, still do to light. Hidden levels never block light, so the sun
+  still lights the ground and the floors under the rendered one. *Not blocked*: light falls into the
+  rooms from above.
   *Block direct sun*: the sun comes in only through windows and openings, while the light of the sky
   still reaches the rooms. *Block all light*: rooms are lit only through their windows and by their
   lamps, so a room without either is dark.
@@ -130,7 +132,7 @@ by name and lists the rest.
 | `quality` | no | `"LOW"` | `"LOW"` or `"HIGH"` |
 | `hideCeilings` | no | `true` | |
 | `isolateLevel` | no | `false` | Render each floor without the other levels |
-| `capLight` | no | `"off"` | What hidden ceilings and levels still block: `"off"`, `"sun"` (direct sun only) or `"all"`. Needs the Blender GPU renderer |
+| `capLight` | no | `"off"` | What the hidden ceilings of the rendered floor still block: `"off"`, `"sun"` (direct sun only) or `"all"`. Needs the Blender GPU renderer |
 | `exposure` | no | `0` | Exposure in stops, from -10 to 10, each stop doubling the brightness. Needs the Blender GPU renderer |
 | `noiseThreshold` | no | `6` | Brightening, from 0 to 255, under which a pixel is left out of a light overlay |
 

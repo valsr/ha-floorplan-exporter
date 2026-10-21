@@ -429,7 +429,7 @@ errors, so a misspelt key is reported rather than silently ignored.
 
 ```json
 {
-  "generator": "ha-floorplan-exporter 0.1.0",
+  "generator": "ha-floorplan-exporter 0.2.0",
   "width": 1920, "height": 1080,
   "renderer": "sh3d.gpurenderer.BlenderRenderer",
   "rendererName": "Blender Cycles (GPU)", "quality": "LOW",
@@ -603,10 +603,10 @@ the option has two strengths instead of one switch.
 
 | Topic | Decision |
 |---|---|
-| Option | `capLight`: `"off"` (default), `"sun"` or `"all"`. Dialog: a choice "Light through hidden ceilings and levels" with *Not blocked*, *Block direct sun*, *Block all light*. |
+| Option | `capLight`: `"off"` (default), `"sun"` or `"all"`. Dialog: a choice "Light through hidden ceilings" with *Not blocked*, *Block direct sun*, *Block all light*. |
 | `sun` | Hidden parts stop only rays going straight to the sun. Sky light still reaches the rooms from above; sun patches appear only where the sun really comes through a window or an opening. |
 | `all` | Hidden parts behave like any object for light: rooms get light only through windows, openings and lamps. |
-| What blocks light | Everything the export hides: the ceilings of the exported floor, every viewable level above it, and, with `isolateLevel`, every viewable level below it. Levels marked not viewable in the home stay out, cap or not. |
+| What blocks light | Only the hidden ceilings of the exported floor (the selected level), a cap on top of it. Hidden levels, above it or below it with `isolateLevel`, block nothing: blocking them shadowed the ground and the floors under the exported one. Levels marked not viewable in the home stay out, cap or not. |
 | Renderers | Only renderers that declare support; today the Blender GPU renderer. With any other, the dialog disables the choice and the command line refuses the instructions before rendering. |
 
 ### 11.4 GPU renderer (`/work/sh3d/gpu-renderer`)
@@ -617,7 +617,7 @@ the option has two strengths instead of one switch.
   `sh3d.gpurenderer.BlenderRenderer.lowQuality.hiddenItemsBlockLight` and
   `…highQuality…`.
 - When it is not `false`, `SceneExporter` writes the hidden ceilings (ceiling
-  alone) and the items of viewable but invisible levels in a second file,
+  alone) of the rooms at the selected level in a second file,
   `occluders.obj`, built from a clone of the home so the home is untouched.
   `scene.json` then has `"occluders": "occluders.obj"` and
   `"occludersBlock": "sun" | "all"`. A separate file is needed because

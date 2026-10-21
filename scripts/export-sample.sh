@@ -45,7 +45,7 @@ write_job "$SAMPLE/job-isolated.json" out-isolated true
 scripts/export.sh "$SAMPLE/job.json"
 scripts/export.sh "$SAMPLE/job-isolated.json"
 
-# Only the Blender GPU renderer can stop light with hidden ceilings and levels, and has an exposure setting
+# Only the Blender GPU renderer can stop light with hidden ceilings, and has an exposure setting
 CAPPED_OUTPUTS=()
 if [[ "${RENDERER,,}" == *blender* ]]; then
   write_job "$SAMPLE/job-sun-capped.json" out-sun-capped false sun

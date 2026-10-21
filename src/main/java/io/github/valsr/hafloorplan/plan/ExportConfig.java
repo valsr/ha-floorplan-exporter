@@ -104,7 +104,7 @@ public final class ExportConfig {
         return this.isolateLevel;
     }
 
-    /** Returns what hidden ceilings and levels still block. */
+    /** Returns what the hidden ceilings of the rendered floor still block. */
     public LightCap getCapLight() {
         return this.capLight;
     }

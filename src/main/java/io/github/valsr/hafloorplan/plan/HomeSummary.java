@@ -141,7 +141,7 @@ public final class HomeSummary {
     public static final class Renderer {
         public final String className;
         public final String displayName;
-        /** <code>true</code> if the renderer can keep hidden ceilings and levels as invisible light blockers. */
+        /** <code>true</code> if the renderer can keep hidden ceilings as invisible light blockers. */
         public final boolean supportsLightCap;
         /** <code>true</code> if the exposure of the images of the renderer can be set. */
         public final boolean supportsExposure;
