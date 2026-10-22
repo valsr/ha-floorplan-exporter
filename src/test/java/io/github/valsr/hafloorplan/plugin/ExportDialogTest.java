@@ -19,6 +19,7 @@ package io.github.valsr.hafloorplan.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.GraphicsEnvironment;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import io.github.valsr.hafloorplan.plan.DateSchedule;
 import io.github.valsr.hafloorplan.plan.ExportConfig;
+import io.github.valsr.hafloorplan.plan.FocusBox;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.Instructions;
 import io.github.valsr.hafloorplan.plan.InstructionsJson;
@@ -311,5 +313,66 @@ class ExportDialogTest {
 
         assertEquals(1, dialog.loadInstructions(file).size());
         assertEquals(before, dialog.getInstructions());
+    }
+
+    @Test
+    void manualFocusRoundTrips() {
+        FocusBox box = new FocusBox(550, 150, 1250, 1050);
+        Instructions instructions = InstructionsResolver.toInstructions(
+                config().width(1920).height(1080).focusMargin(7)
+                        .floors(Arrays.asList(new ExportConfig.Floor("f2", "c2", box))).build(),
+                summary(), HOME_FILE.getAbsolutePath());
+        ExportDialog dialog = dialog();
+        dialog.setInstructions(instructions);
+
+        assertTrue(dialog.getLoadWarnings().isEmpty(), dialog.getLoadWarnings().toString());
+        assertEquals("Focus: 550\u20131250 \u00d7 150\u20131050", dialog.floorRow("f2").focusButton.getText());
+        Instructions state = dialog.getInstructions();
+        assertEquals(box, state.getFloors().get(0).focus);
+        assertEquals(7.0, state.getFocusMargin());
+        assertEquals(instructions, state);
+    }
+
+    @Test
+    void autoFocusByDefault() {
+        ExportDialog dialog = dialog();
+        assertEquals("Focus: Auto", dialog.floorRow("f1").focusButton.getText());
+        assertNull(dialog.getInstructions().getFloors().get(0).focus);
+        assertEquals(5.0, dialog.getInstructions().getFocusMargin());
+    }
+
+    @Test
+    void manualBoxLargerThanImageIsAnError() {
+        ExportDialog dialog = dialog();
+        dialog.setInstructions(InstructionsResolver.toInstructions(
+                config().width(1920).height(1080).build(), summary(), null));
+        dialog.setFocus(dialog.floorRow("f2"), new FocusBox(0, 0, 1920, 1080));
+        assertTrue(dialog.exportButton.isEnabled(), dialog.getValidationErrors().toString());
+
+        dialog.widthSpinner.setValue(1600);
+        assertEquals(1, dialog.getValidationErrors().size(), dialog.getValidationErrors().toString());
+        assertTrue(dialog.getValidationErrors().get(0).contains("First"), dialog.getValidationErrors().get(0));
+        assertFalse(dialog.exportButton.isEnabled());
+        assertFalse(dialog.saveButton.isEnabled());
+
+        dialog.widthSpinner.setValue(1920);
+        assertTrue(dialog.exportButton.isEnabled(), dialog.getValidationErrors().toString());
+    }
+
+    @Test
+    void focusButtonFollowsFloorCheckBox() {
+        ExportDialog dialog = dialog();
+        assertTrue(dialog.floorRow("f1").focusButton.isEnabled());
+        dialog.floorRow("f1").checkBox.doClick();
+        assertFalse(dialog.floorRow("f1").focusButton.isEnabled());
+    }
+
+    @Test
+    void clearingTheBoxReturnsToAuto() {
+        ExportDialog dialog = dialog();
+        dialog.setFocus(dialog.floorRow("f1"), new FocusBox(1, 2, 3, 4));
+        dialog.setFocus(dialog.floorRow("f1"), null);
+        assertEquals("Focus: Auto", dialog.floorRow("f1").focusButton.getText());
+        assertNull(dialog.getInstructions().getFloors().get(0).focus);
     }
 }

@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,9 +34,15 @@ import org.junit.jupiter.api.Test;
 @SuppressWarnings("unchecked")
 class ManifestWriterTest {
     private static Map<String, Object> manifest(ExportConfig config, HomeSummary summary, boolean night) {
+        return manifest(config, summary, night, Collections.<String, FocusBox>emptyMap());
+    }
+
+    private static Map<String, Object> manifest(ExportConfig config, HomeSummary summary, boolean night,
+                                                Map<String, FocusBox> computedFocus) {
         ExportPlan plan = ExportPlanner.plan(config, summary);
         return (Map<String, Object>)Json.parse(ManifestWriter.write(config, summary, plan, "ha-floorplan-exporter 0.1.0",
-                night ? LocalDateTime.parse("2026-01-01T00:00") : null, night ? Double.valueOf(-58.2) : null));
+                night ? LocalDateTime.parse("2026-01-01T00:00") : null, night ? Double.valueOf(-58.2) : null,
+                computedFocus));
     }
 
     @Test
@@ -109,5 +117,40 @@ class ManifestWriterTest {
         assertFalse(manifest.containsKey("nightTime"));
         assertFalse(manifest.containsKey("nightSunElevation"));
         assertFalse(((List<Map<String, Object>>)manifest.get("floors")).get(0).containsKey("night"));
+    }
+
+    @Test
+    void writesFocus() {
+        ExportConfig config = ExportPlannerTest.config().focusMargin(7)
+                .floors(Arrays.asList(new ExportConfig.Floor("f1", "c1", new FocusBox(550, 150, 1250, 1050)),
+                                      new ExportConfig.Floor("f2", null)))
+                .build();
+        Map<String, FocusBox> computed = new java.util.HashMap<String, FocusBox>();
+        computed.put("f1", new FocusBox(0, 0, 10, 10));
+        computed.put("f2", new FocusBox(600, 170, 1180, 970));
+        Map<String, Object> manifest = manifest(config, ExportPlannerTest.summary(), false, computed);
+
+        assertEquals(7.0, manifest.get("focusMargin"));
+        List<String> keys = new ArrayList<String>(manifest.keySet());
+        assertEquals(keys.indexOf("exposure") + 1, keys.indexOf("focusMargin"));
+        List<Map<String, Object>> floors = (List<Map<String, Object>>)manifest.get("floors");
+        Map<String, Object> manual = (Map<String, Object>)floors.get(0).get("focus");
+        assertEquals(Arrays.asList(550.0, 1250.0), manual.get("x"));
+        assertEquals(Arrays.asList(150.0, 1050.0), manual.get("y"));
+        assertEquals("manual", manual.get("source"));
+        List<String> floorKeys = new ArrayList<String>(floors.get(0).keySet());
+        assertEquals(floorKeys.indexOf("camera") + 1, floorKeys.indexOf("focus"));
+        Map<String, Object> auto = (Map<String, Object>)floors.get(1).get("focus");
+        assertEquals(Arrays.asList(600.0, 1180.0), auto.get("x"));
+        assertEquals(Arrays.asList(170.0, 970.0), auto.get("y"));
+        assertEquals("auto", auto.get("source"));
+    }
+
+    @Test
+    void writesNullFocusWithoutBox() {
+        Map<String, Object> manifest = manifest(ExportPlannerTest.config().build(), ExportPlannerTest.summary(), false);
+        Map<String, Object> floor = ((List<Map<String, Object>>)manifest.get("floors")).get(1);
+        assertTrue(floor.containsKey("focus"));
+        assertNull(floor.get("focus"));
     }
 }

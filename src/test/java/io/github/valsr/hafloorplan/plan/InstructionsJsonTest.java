@@ -217,4 +217,46 @@ class InstructionsJsonTest {
         assertEquals(1, problems.size());
         assertTrue(problems.get(0).contains("line 1"), problems.get(0));
     }
+
+    @Test
+    void readsAndWritesFocus() {
+        String json = "{\"version\":1,\"floors\":[{\"level\":\"Second\",\"focus\":{\"x\":[550,1250],\"y\":[150,1050]}}],"
+                + "\"dates\":{\"start\":\"2026-01-01\",\"end\":\"2026-01-01\",\"intervalDays\":1},"
+                + "\"times\":{\"start\":\"12:00\",\"end\":\"12:00\",\"intervalMinutes\":60},\"focusMargin\":7.5}";
+        Instructions instructions = InstructionsJson.parse(json);
+
+        assertEquals(new FocusBox(550, 150, 1250, 1050), instructions.getFloors().get(0).focus);
+        assertEquals(7.5, instructions.getFocusMargin());
+        assertEquals(instructions, InstructionsJson.parse(InstructionsJson.write(instructions)));
+    }
+
+    @Test
+    void defaultsWithoutFocus() {
+        Instructions instructions = InstructionsJson.parse(SPEC_EXAMPLE);
+
+        assertNull(instructions.getFloors().get(0).focus);
+        assertEquals(5.0, instructions.getFocusMargin());
+        String written = InstructionsJson.write(instructions);
+        // Json writes whole numbers without a decimal point, as it does "exposure": 0
+        assertTrue(written.contains("\"focusMargin\": 5,"), written);
+        assertFalse(written.contains("\"focus\""), written);
+    }
+
+    @Test
+    void refusesBadFocus() {
+        for (String focus : new String [] {"{\"x\":[550]}", "{\"x\":[1250,550],\"y\":[150,1050]}",
+                                           "{\"x\":[550,1250],\"y\":[150,1050],\"z\":1}", "{\"x\":[5.5,1250],\"y\":[150,1050]}",
+                                           "[550,1250]"}) {
+            String json = "{\"version\":1,\"floors\":[{\"level\":\"Second\",\"focus\":" + focus + "}],"
+                    + "\"dates\":{\"start\":\"2026-01-01\",\"end\":\"2026-01-01\",\"intervalDays\":1},"
+                    + "\"times\":{\"start\":\"12:00\",\"end\":\"12:00\",\"intervalMinutes\":60}}";
+            List<String> problems = problems(json);
+            assertTrue(problems.toString().contains("floors[0].focus"), focus + " gave " + problems);
+        }
+        for (String margin : new String [] {"60", "-1", "\"5\""}) {
+            List<String> problems = problems(minimal("\"focusMargin\":" + margin));
+            assertEquals(1, problems.size(), problems.toString());
+            assertTrue(problems.get(0).contains("\"focusMargin\"") && problems.get(0).contains("0 to 50"), problems.get(0));
+        }
+    }
 }

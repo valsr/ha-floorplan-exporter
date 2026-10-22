@@ -217,4 +217,41 @@ class InstructionsResolverTest {
         assertEquals(9, copy.getNoiseThreshold());
         assertEquals(new File("/out"), copy.getOutputDir());
     }
+
+    @Test
+    void focusOutsideImageIsRefused() {
+        InstructionsResolver.Resolution resolution = resolve(builder().width(1920).height(1080).floors(
+                Collections.singletonList(new Instructions.Floor(Ref.of("Ground"), null, new FocusBox(0, 0, 1921, 1080)))));
+
+        assertEquals(1, resolution.getProblems().size(), resolution.getProblems().toString());
+        assertTrue(resolution.getProblems().get(0).contains("Ground")
+                && resolution.getProblems().get(0).contains("focus"), resolution.getProblems().get(0));
+        assertNull(resolution.getConfig().getFloors().get(0).focus);
+    }
+
+    @Test
+    void focusSurvivesResolution() {
+        FocusBox box = new FocusBox(550, 150, 1250, 1050);
+        InstructionsResolver.Resolution resolution = resolve(builder().focusMargin(7.5).floors(
+                Collections.singletonList(new Instructions.Floor(Ref.of("Ground"), Ref.of("Top ground"), box))));
+
+        assertTrue(resolution.getProblems().isEmpty(), resolution.getProblems().toString());
+        assertEquals(box, resolution.getConfig().getFloors().get(0).focus);
+        assertEquals(7.5, resolution.getConfig().getFocusMargin());
+        Instructions back = InstructionsResolver.toInstructions(resolution.getConfig(), summary(), null);
+        assertEquals(box, back.getFloors().get(0).focus);
+        assertEquals(7.5, back.getFocusMargin());
+    }
+
+    @Test
+    void allFloorsUseComputedBoxes() {
+        InstructionsResolver.Resolution resolution = resolve(builder().allFloors().focusMargin(3));
+
+        assertTrue(resolution.getProblems().isEmpty(), resolution.getProblems().toString());
+        assertEquals(2, resolution.getConfig().getFloors().size());
+        for (ExportConfig.Floor floor : resolution.getConfig().getFloors()) {
+            assertNull(floor.focus);
+        }
+        assertEquals(3.0, resolution.getConfig().getFocusMargin());
+    }
 }

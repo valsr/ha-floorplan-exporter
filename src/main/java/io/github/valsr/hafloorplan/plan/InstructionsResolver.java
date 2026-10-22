@@ -91,7 +91,13 @@ public final class InstructionsResolver {
                 }
                 String cameraId = floor.camera != null ? find(floor.camera, cameraNames, "camera", problems) : null;
                 floorIds.add(levelId);
-                floors.add(new ExportConfig.Floor(levelId, cameraId));
+                FocusBox focus = floor.focus;
+                if (focus != null && !focus.fits(instructions.getWidth(), instructions.getHeight())) {
+                    problems.add("Floor \"" + floorNames.get(levelId) + "\": focus " + focus + " must lie inside the "
+                            + instructions.getWidth() + " x " + instructions.getHeight() + " image");
+                    focus = null;
+                }
+                floors.add(new ExportConfig.Floor(levelId, cameraId, focus));
             }
         }
 
@@ -144,6 +150,7 @@ public final class InstructionsResolver {
                 .isolateLevel(instructions.isIsolateLevel())
                 .capLight(capLight)
                 .exposure(exposure)
+                .focusMargin(instructions.getFocusMargin())
                 .noiseThreshold(instructions.getNoiseThreshold())
                 .outputDir(outputDir)
                 .build();
@@ -211,7 +218,8 @@ public final class InstructionsResolver {
             HomeSummary.Floor level = summary.floor(floor.levelId);
             HomeSummary.Camera camera = floor.cameraId != null ? summary.camera(floor.cameraId) : null;
             floors.add(new Instructions.Floor(new Ref(floor.levelId, level != null ? level.name : null),
-                    floor.cameraId != null ? new Ref(floor.cameraId, camera != null ? camera.name : null) : null));
+                    floor.cameraId != null ? new Ref(floor.cameraId, camera != null ? camera.name : null) : null,
+                    floor.focus));
         }
         List<Ref> lights = new ArrayList<Ref>();
         for (String lightId : config.getLightIds()) {
@@ -233,6 +241,7 @@ public final class InstructionsResolver {
                 .isolateLevel(config.isIsolateLevel())
                 .capLight(config.getCapLight())
                 .exposure(config.getExposure())
+                .focusMargin(config.getFocusMargin())
                 .noiseThreshold(config.getNoiseThreshold())
                 .build();
     }

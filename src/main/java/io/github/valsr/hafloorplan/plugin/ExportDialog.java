@@ -67,6 +67,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import io.github.valsr.hafloorplan.plan.DateSchedule;
 import io.github.valsr.hafloorplan.plan.ExportConfig;
 import io.github.valsr.hafloorplan.plan.ExportPlanner;
+import io.github.valsr.hafloorplan.plan.FocusBox;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.Instructions;
 import io.github.valsr.hafloorplan.plan.InstructionsException;
@@ -101,7 +102,7 @@ class ExportDialog extends JDialog {
     private final JSpinner timeIntervalSpinner = new JSpinner(new SpinnerNumberModel(240, 1, 1440, 30));
     final JButton allLightsButton = new JButton(MESSAGES.getString("lights.all"));
     final JButton noLightsButton = new JButton(MESSAGES.getString("lights.none"));
-    private final JSpinner widthSpinner = new JSpinner(new SpinnerNumberModel(1920, 1, 16384, 10));
+    final JSpinner widthSpinner = new JSpinner(new SpinnerNumberModel(1920, 1, 16384, 10));
     private final JSpinner heightSpinner = new JSpinner(new SpinnerNumberModel(1080, 1, 16384, 10));
     final JComboBox<Item> rendererComboBox = new JComboBox<Item>();
     private final JComboBox<String> qualityComboBox = new JComboBox<String>(new String [] {
@@ -113,6 +114,7 @@ class ExportDialog extends JDialog {
             MESSAGES.getString("options.capLight.off"), MESSAGES.getString("options.capLight.sun"),
             MESSAGES.getString("options.capLight.all")});
     final JSpinner exposureSpinner = new JSpinner(new SpinnerNumberModel(0., -10., 10., 0.25));
+    final JSpinner focusMarginSpinner = new JSpinner(new SpinnerNumberModel(5., 0., 50., 1.));
     final JTextField outputField = new JTextField(30);
     private final JLabel summaryLabel = new JLabel(" ");
     private final JLabel errorLabel = new JLabel(" ");
@@ -179,6 +181,8 @@ class ExportDialog extends JDialog {
             constraints.gridx = 1;
             constraints.weightx = 0;
             floorsPanel.add(row.cameraComboBox, constraints);
+            constraints.gridx = 2;
+            floorsPanel.add(row.focusButton, constraints);
         }
 
         JPanel lightsList = new JPanel();
@@ -235,6 +239,8 @@ class ExportDialog extends JDialog {
         optionsPanel.add(this.capLightComboBox, constraints);
         constraints.gridwidth = 1;
         addOption(optionsPanel, constraints, "options.exposure", this.exposureSpinner);
+        this.focusMarginSpinner.setToolTipText(MESSAGES.getString("options.focusMargin.tooltip"));
+        addOption(optionsPanel, constraints, "options.focusMargin", this.focusMarginSpinner);
 
         JButton browseButton = new JButton(MESSAGES.getString("output.browse"));
         browseButton.addActionListener(new ActionListener() {
@@ -342,9 +348,14 @@ class ExportDialog extends JDialog {
                 updateState();
             }
         };
-        for (FloorRow row : this.floorRows) {
+        for (final FloorRow row : this.floorRows) {
             row.checkBox.addActionListener(actionListener);
             row.cameraComboBox.addActionListener(actionListener);
+            row.focusButton.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ev) {
+                    editFocus(row);
+                }
+            });
         }
         for (LightRow row : this.lightRows) {
             row.checkBox.addActionListener(actionListener);
@@ -356,6 +367,9 @@ class ExportDialog extends JDialog {
         this.rendererComboBox.addActionListener(actionListener);
         this.dateIntervalSpinner.addChangeListener(changeListener);
         this.timeIntervalSpinner.addChangeListener(changeListener);
+        // A focus box set by hand must still fit when the image size changes
+        this.widthSpinner.addChangeListener(changeListener);
+        this.heightSpinner.addChangeListener(changeListener);
 
         this.allLightsButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
@@ -390,6 +404,76 @@ class ExportDialog extends JDialog {
         });
     }
 
+    /** Returns the row of the floor <code>floorId</code>. */
+    FloorRow floorRow(String floorId) {
+        for (FloorRow row : this.floorRows) {
+            if (row.floor.id.equals(floorId)) {
+                return row;
+            }
+        }
+        throw new IllegalArgumentException("No floor " + floorId);
+    }
+
+    /** Sets the focus box of a floor, <code>null</code> to compute it. */
+    void setFocus(FloorRow row, FocusBox focus) {
+        row.focus = focus;
+        row.focusButton.setText(focus == null
+                ? MESSAGES.getString("floors.focusAuto")
+                : MessageFormat.format(MESSAGES.getString("floors.focusBox"), focus.left, focus.right, focus.top, focus.bottom));
+        updateState();
+    }
+
+    /** Lets the user set the focus box of a floor by hand or go back to a computed one. */
+    private void editFocus(FloorRow row) {
+        int width = (Integer)this.widthSpinner.getValue();
+        int height = (Integer)this.heightSpinner.getValue();
+        FocusBox start = row.focus != null ? row.focus : new FocusBox(0, 0, width, height);
+        final JCheckBox manualCheckBox = new JCheckBox(MESSAGES.getString("focus.manual"), row.focus != null);
+        final JSpinner [] spinners = {
+            new JSpinner(new SpinnerNumberModel(Math.min(start.left, width), 0, width, 1)),
+            new JSpinner(new SpinnerNumberModel(Math.min(start.right, width), 0, width, 1)),
+            new JSpinner(new SpinnerNumberModel(Math.min(start.top, height), 0, height, 1)),
+            new JSpinner(new SpinnerNumberModel(Math.min(start.bottom, height), 0, height, 1))};
+        String [] labelKeys = {"focus.left", "focus.right", "focus.top", "focus.bottom"};
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints constraints = new GridBagConstraints();
+        constraints.anchor = GridBagConstraints.LINE_START;
+        constraints.insets = new Insets(2, 2, 2, 8);
+        constraints.gridwidth = 2;
+        panel.add(manualCheckBox, constraints);
+        constraints.gridwidth = 1;
+        for (int i = 0; i < spinners.length; i++) {
+            spinners [i].setEditor(new JSpinner.NumberEditor(spinners [i], "#"));
+            spinners [i].setEnabled(manualCheckBox.isSelected());
+            addOption(panel, constraints, labelKeys [i], spinners [i]);
+        }
+        manualCheckBox.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ev) {
+                for (JSpinner spinner : spinners) {
+                    spinner.setEnabled(manualCheckBox.isSelected());
+                }
+            }
+        });
+        if (JOptionPane.showConfirmDialog(this, panel, MessageFormat.format(MESSAGES.getString("focus.title"), row.floor.name),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        if (!manualCheckBox.isSelected()) {
+            setFocus(row, null);
+            return;
+        }
+        int left = (Integer)spinners [0].getValue();
+        int right = (Integer)spinners [1].getValue();
+        int top = (Integer)spinners [2].getValue();
+        int bottom = (Integer)spinners [3].getValue();
+        if (left >= right || top >= bottom) {
+            JOptionPane.showMessageDialog(this, MESSAGES.getString("focus.empty"),
+                    MessageFormat.format(MESSAGES.getString("focus.title"), row.floor.name), JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        setFocus(row, new FocusBox(left, top, right, bottom));
+    }
+
     private void selectAllLights(boolean selected) {
         for (LightRow row : this.lightRows) {
             row.checkBox.setSelected(selected);
@@ -418,6 +502,12 @@ class ExportDialog extends JDialog {
         }
         if (!floorSelected) {
             errors.add(MESSAGES.getString("error.noFloor"));
+        }
+        for (FloorRow row : this.floorRows) {
+            if (row.checkBox.isSelected() && row.focus != null
+                    && !row.focus.fits((Integer)this.widthSpinner.getValue(), (Integer)this.heightSpinner.getValue())) {
+                errors.add(MessageFormat.format(MESSAGES.getString("error.focusOutside"), row.floor.name));
+            }
         }
         if (this.outputField.getText().trim().isEmpty()) {
             errors.add(MESSAGES.getString("error.noOutput"));
@@ -486,7 +576,7 @@ class ExportDialog extends JDialog {
             if (row.checkBox.isSelected()) {
                 Item camera = (Item)row.cameraComboBox.getSelectedItem();
                 floors.add(new Instructions.Floor(new Ref(row.floor.id, row.floor.name),
-                        camera.id != null ? new Ref(camera.id, camera.label) : null));
+                        camera.id != null ? new Ref(camera.id, camera.label) : null, row.focus));
             }
         }
         List<Ref> lights = new ArrayList<Ref>();
@@ -514,6 +604,7 @@ class ExportDialog extends JDialog {
                         ? LightCap.values() [this.capLightComboBox.getSelectedIndex()]
                         : LightCap.OFF)
                 .exposure(isExposureSupported() ? ((Number)this.exposureSpinner.getValue()).doubleValue() : 0)
+                .focusMargin(((Number)this.focusMarginSpinner.getValue()).doubleValue())
                 .noiseThreshold(this.noiseThreshold)
                 .build();
     }
@@ -569,12 +660,15 @@ class ExportDialog extends JDialog {
             for (FloorRow row : this.floorRows) {
                 row.checkBox.setSelected(false);
                 row.cameraComboBox.setSelectedIndex(0);
+                FocusBox focus = null;
                 for (ExportConfig.Floor floor : config.getFloors()) {
                     if (floor.levelId.equals(row.floor.id)) {
                         row.checkBox.setSelected(true);
                         selectItem(row.cameraComboBox, floor.cameraId);
+                        focus = floor.focus;
                     }
                 }
+                setFocus(row, focus);
             }
             for (LightRow row : this.lightRows) {
                 row.checkBox.setSelected(config.getLightIds().contains(row.light.id));
@@ -593,6 +687,7 @@ class ExportDialog extends JDialog {
             this.isolateCheckBox.setSelected(config.isIsolateLevel());
             this.capLightComboBox.setSelectedIndex(config.getCapLight().ordinal());
             this.exposureSpinner.setValue(config.getExposure());
+            this.focusMarginSpinner.setValue(config.getFocusMargin());
             this.noiseThreshold = config.getNoiseThreshold();
             this.outputField.setText(config.getOutputDir() != null ? config.getOutputDir().getPath() : "");
         } finally {
@@ -644,6 +739,7 @@ class ExportDialog extends JDialog {
         }
         for (FloorRow row : this.floorRows) {
             row.cameraComboBox.setEnabled(row.checkBox.isSelected());
+            row.focusButton.setEnabled(row.checkBox.isSelected());
         }
         boolean lightCapSupported = isLightCapSupported();
         this.capLightComboBox.setEnabled(lightCapSupported);
@@ -755,10 +851,13 @@ class ExportDialog extends JDialog {
     }
 
     /** A floor with the camera it's seen from. */
-    private final class FloorRow {
+    final class FloorRow {
         final HomeSummary.Floor floor;
         final JCheckBox checkBox;
         final JComboBox<Item> cameraComboBox = new JComboBox<Item>();
+        final JButton focusButton = new JButton(MESSAGES.getString("floors.focusAuto"));
+        /** The focus box set by hand, or <code>null</code> to compute it. */
+        FocusBox focus;
 
         FloorRow(HomeSummary.Floor floor) {
             this.floor = floor;

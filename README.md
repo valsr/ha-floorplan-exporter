@@ -25,6 +25,14 @@ up pixel for pixel. The same export runs from a dialog in Sweet Home 3D or from 
 that would generate the ha-floorplan configuration. It is written last: a folder without it comes
 from an export that failed or was cancelled.
 
+Each floor of the manifest also has a `focus`: the rectangle of its images the walls of that floor
+occupy, as `{"x": [left, right], "y": [top, bottom], "source": …}` in pixels, to crop or centre the
+images on the house. By default it's computed (`"source": "auto"`) by projecting the walls of the
+floor, from their bottom to their top, through its point of view, then widened by `focusMargin` %
+of its width and height on each side and clipped to the image. A box set by hand for the floor is
+written as is (`"source": "manual"`). It's `null` when there's nothing to compute: no walls on the
+floor, a fisheye or spherical lens, or walls behind the camera.
+
 Overlays are computed against `night.png`. Drawn over that image they reproduce the lit render
 exactly; over a daytime base they are an approximation.
 
@@ -48,7 +56,9 @@ Restart Sweet Home 3D; **Tools > Export for HA Floorplan…** appears.
 ## Using the dialog
 
 - **Floors**: tick the floors to export and choose for each the stored point of view it is seen
-  from (*3D view > Store point of view* in Sweet Home 3D), or the current 3D view.
+  from (*3D view > Store point of view* in Sweet Home 3D), or the current 3D view. The **Focus**
+  button after it reads *Auto* while the focus box of the floor is computed, and lets you set the
+  box by hand instead.
 - **Dates** and **Times of day**: a start, an end and an interval. Both ends are included; one
   base image is rendered per floor, date and time.
 - **Lights**: the lights to make overlays for. A light is rendered on the floor it stands on,
@@ -68,6 +78,8 @@ Restart Sweet Home 3D; **Tools > Export for HA Floorplan…** appears.
 - **Exposure** (Blender GPU renderer only) brightens or darkens the images, in stops: each stop
   doubles the brightness. The renderer exposes for daylight, so rooms lit only through their windows,
   as with *Block all light*, usually need 1 to 3 stops.
+- **Focus margin (%)** is the space added around a computed focus box, in % of its width and
+  height; a box set by hand is used as is.
 - **Renderer** lists the photo renderers Sweet Home 3D has available, at its two ray-traced
   quality levels.
 
@@ -101,7 +113,7 @@ by name and lists the rest.
   "output": "out",
   "floors": [
     {"level": "Ground floor", "camera": "Top ground"},
-    {"level": {"id": "level-1a2b", "name": "First floor"}}
+    {"level": {"id": "level-1a2b", "name": "First floor"}, "focus": {"x": [550, 1250], "y": [150, 1050]}}
   ],
   "dates": {"start": "2026-01-01", "end": "2026-12-31", "intervalDays": 30},
   "times": {"start": "00:00", "end": "23:00", "intervalMinutes": 240},
@@ -114,6 +126,7 @@ by name and lists the rest.
   "isolateLevel": false,
   "capLight": "sun",
   "exposure": 0,
+  "focusMargin": 5,
   "noiseThreshold": 6
 }
 ```
@@ -123,7 +136,8 @@ by name and lists the rest.
 | `version` | yes | | `1` |
 | `home` | no | | The `.sh3d` file, unless given with `--home` |
 | `output` | unless `--output` | | Output folder |
-| `floors` | yes | | Array of `{level, camera}`, or `"*"` for every floor from the current view. Without `camera`, the view the home was saved with |
+| `floors` | yes | | Array of `{level, camera, focus}`, or `"*"` for every floor from the current view. Without `camera`, the view the home was saved with; without `focus`, a computed focus box |
+| `floors[].focus` | no | computed | Focus box set by hand: `{"x": [left, right], "y": [top, bottom]}` in whole pixels, inside the image |
 | `dates` | yes | | `start`, `end` (`YYYY-MM-DD`) and `intervalDays` |
 | `times` | yes | | `start`, `end` (`HH:mm`) and `intervalMinutes` |
 | `lights` | no | `"*"` | Array of lights, `"*"` for all, `[]` for none |
@@ -134,6 +148,7 @@ by name and lists the rest.
 | `isolateLevel` | no | `false` | Render each floor without the other levels |
 | `capLight` | no | `"off"` | What the hidden ceilings of the rendered floor still block: `"off"`, `"sun"` (direct sun only) or `"all"`. Needs the Blender GPU renderer |
 | `exposure` | no | `0` | Exposure in stops, from -10 to 10, each stop doubling the brightness. Needs the Blender GPU renderer |
+| `focusMargin` | no | `5` | Margin around a computed focus box, in % of its width and height, from 0 to 50 |
 | `noiseThreshold` | no | `6` | Brightening, from 0 to 255, under which a pixel is left out of a light overlay |
 
 A level, a point of view or a light is written as its name, or as `{"id": …, "name": …}`, the

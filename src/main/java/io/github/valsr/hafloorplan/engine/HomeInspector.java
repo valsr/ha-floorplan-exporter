@@ -27,6 +27,7 @@ import com.eteks.sweethome3d.model.HomeFurnitureGroup;
 import com.eteks.sweethome3d.model.HomeLight;
 import com.eteks.sweethome3d.model.HomePieceOfFurniture;
 import com.eteks.sweethome3d.model.Level;
+import com.eteks.sweethome3d.model.Wall;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 
@@ -70,6 +71,41 @@ public final class HomeInspector {
             }
         }
         return new HomeSummary(floors, lights, cameras, backend.availableRenderers());
+    }
+
+    /**
+     * Returns the corners of the walls of the floor <code>floorId</code> as <code>{x, y, elevation}</code>:
+     * each point of their outline, with their thickness, at the bottom and at the top of the wall. The walls
+     * are the ones Sweet Home 3D shows at that floor, including those rising from a lower level, which start at
+     * the elevation of the floor. A sloping wall gets its higher end everywhere. In a home without levels, every
+     * wall counts, from elevation 0.
+     */
+    static List<double []> getWallCorners(Home home, String floorId) {
+        Level floor = null;
+        for (Level level : home.getLevels()) {
+            if (level.getId().equals(floorId)) {
+                floor = level;
+            }
+        }
+        boolean allWalls = HomeSummary.DEFAULT_FLOOR_ID.equals(floorId) && home.getLevels().isEmpty();
+        List<double []> corners = new ArrayList<double []>();
+        for (Wall wall : home.getWalls()) {
+            if (!allWalls && (floor == null || !wall.isAtLevel(floor))) {
+                continue;
+            }
+            Level level = wall.getLevel();
+            double base = level != null ? level.getElevation() : 0;
+            float height = wall.getHeight() != null ? wall.getHeight() : home.getWallHeight();
+            if (wall.getHeightAtEnd() != null) {
+                height = Math.max(height, wall.getHeightAtEnd());
+            }
+            double bottom = floor != null ? Math.max(base, floor.getElevation()) : base;
+            for (float [] point : wall.getPoints()) {
+                corners.add(new double [] {point [0], point [1], bottom});
+                corners.add(new double [] {point [0], point [1], base + height});
+            }
+        }
+        return corners;
     }
 
     /**
