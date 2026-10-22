@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +41,10 @@ public final class ManifestWriter {
      * Returns the JSON text of the manifest.
      * @param nightTime the time lights were rendered at, or <code>null</code> if no light is exported
      * @param nightSunElevation the elevation of the sun in degrees at that time, or <code>null</code>
+     * @param computedFocus the focus boxes computed for floors, by floor id; a floor's box set by hand wins
      */
     public static String write(ExportConfig config, HomeSummary summary, ExportPlan plan, String generator,
-                               LocalDateTime nightTime, Double nightSunElevation) {
+                               LocalDateTime nightTime, Double nightSunElevation, Map<String, FocusBox> computedFocus) {
         Map<String, Object> manifest = new LinkedHashMap<String, Object>();
         manifest.put("generator", generator);
         manifest.put("width", config.getWidth());
@@ -55,6 +57,7 @@ public final class ManifestWriter {
         manifest.put("isolateLevel", config.isIsolateLevel());
         manifest.put("capLight", config.getCapLight().toText());
         manifest.put("exposure", config.getExposure());
+        manifest.put("focusMargin", config.getFocusMargin());
         List<Object> dates = new ArrayList<Object>();
         for (LocalDate date : config.getDates().dates()) {
             dates.add(date.toString());
@@ -79,6 +82,13 @@ public final class ManifestWriter {
             floorObject.put("name", summaryFloor != null ? summaryFloor.name : null);
             floorObject.put("slug", plan.floorSlug(floor.levelId));
             floorObject.put("camera", camera != null ? camera.name : null);
+            if (floor.focus != null) {
+                floorObject.put("focus", focus(floor.focus, "manual"));
+            } else if (computedFocus.get(floor.levelId) != null) {
+                floorObject.put("focus", focus(computedFocus.get(floor.levelId), "auto"));
+            } else {
+                floorObject.put("focus", null);
+            }
             List<Object> base = new ArrayList<Object>();
             List<Object> lights = new ArrayList<Object>();
             String night = null;
@@ -126,5 +136,13 @@ public final class ManifestWriter {
         }
         manifest.put("skippedLights", skippedLights);
         return Json.write(manifest);
+    }
+
+    private static Map<String, Object> focus(FocusBox box, String source) {
+        Map<String, Object> focus = new LinkedHashMap<String, Object>();
+        focus.put("x", Arrays.<Object>asList(box.left, box.right));
+        focus.put("y", Arrays.<Object>asList(box.top, box.bottom));
+        focus.put("source", source);
+        return focus;
     }
 }

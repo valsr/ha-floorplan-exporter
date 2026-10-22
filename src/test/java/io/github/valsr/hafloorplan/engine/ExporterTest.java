@@ -20,6 +20,7 @@ package io.github.valsr.hafloorplan.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,6 +33,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,15 +44,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.eteks.sweethome3d.model.Camera;
 import com.eteks.sweethome3d.model.Home;
 import com.eteks.sweethome3d.model.HomeLight;
 import com.eteks.sweethome3d.model.Level;
 import com.eteks.sweethome3d.model.Room;
+import com.eteks.sweethome3d.model.Wall;
 
 import io.github.valsr.hafloorplan.plan.DateSchedule;
 import io.github.valsr.hafloorplan.plan.ExportConfig;
 import io.github.valsr.hafloorplan.plan.ExportPlan;
 import io.github.valsr.hafloorplan.plan.ExportPlanner;
+import io.github.valsr.hafloorplan.plan.FocusBox;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.Json;
 import io.github.valsr.hafloorplan.plan.LightCap;
@@ -410,5 +415,64 @@ class ExporterTest {
         assertEquals("end 0/8", events.get(1));
         assertEquals("start 3/8 LIGHT", events.get(6));
         assertEquals("end 7/8", events.get(15));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> groundFocus() throws Exception {
+        Map<String, Object> manifest = (Map<String, Object>)Json.parse(
+                new String(Files.readAllBytes(file("manifest.json").toPath()), StandardCharsets.UTF_8));
+        return (Map<String, Object>)((List<Map<String, Object>>)manifest.get("floors")).get(0).get("focus");
+    }
+
+    /** Adds a 300 cm wall in the middle of the ground floor, seen by its top camera. */
+    private void addGroundWall() {
+        this.home.setSelectedLevel(this.home.getLevels().get(0));
+        this.home.addWall(new Wall(100, 200, 400, 200, 20, 250));
+    }
+
+    private ExportConfig.Builder groundOnly(FocusBox focus) {
+        return config().width(800).height(600).lightIds(Collections.<String>emptyList())
+                .floors(Collections.singletonList(new ExportConfig.Floor(
+                        this.summary.getFloors().get(0).id, this.summary.getCameras().get(0).id, focus)));
+    }
+
+    @Test
+    void manualFocusWins() throws Exception {
+        addGroundWall();
+        assertTrue(exporter(groundOnly(new FocusBox(10, 20, 30, 40)).build()).run(null));
+
+        Map<String, Object> focus = groundFocus();
+        assertEquals("manual", focus.get("source"));
+        assertEquals(Arrays.asList(10.0, 30.0), focus.get("x"));
+        assertEquals(Arrays.asList(20.0, 40.0), focus.get("y"));
+    }
+
+    @Test
+    void computedFocusForFloorWithWalls() throws Exception {
+        addGroundWall();
+        assertTrue(exporter(groundOnly(null).build()).run(null));
+
+        Map<String, Object> focus = groundFocus();
+        assertEquals("auto", focus.get("source"));
+        List<Double> x = (List<Double>)focus.get("x");
+        List<Double> y = (List<Double>)focus.get("y");
+        assertTrue(0 <= x.get(0) && x.get(0) < x.get(1) && x.get(1) <= 800, x.toString());
+        assertTrue(0 <= y.get(0) && y.get(0) < y.get(1) && y.get(1) <= 600, y.toString());
+    }
+
+    @Test
+    void floorWithoutWallsHasNullFocus() throws Exception {
+        assertTrue(exporter(groundOnly(null).build()).run(null));
+
+        assertNull(groundFocus());
+    }
+
+    @Test
+    void fisheyeCameraHasNullFocus() throws Exception {
+        addGroundWall();
+        this.home.getStoredCameras().get(0).setLens(Camera.Lens.FISHEYE);
+        assertTrue(exporter(groundOnly(null).build()).run(null));
+
+        assertNull(groundFocus());
     }
 }

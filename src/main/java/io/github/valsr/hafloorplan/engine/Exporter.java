@@ -27,7 +27,9 @@ import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.imageio.ImageIO;
@@ -40,6 +42,8 @@ import io.github.valsr.hafloorplan.plan.ExportPlan;
 import io.github.valsr.hafloorplan.plan.ExportPlanner;
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 import io.github.valsr.hafloorplan.plan.LightCap;
+import io.github.valsr.hafloorplan.plan.FocusBox;
+import io.github.valsr.hafloorplan.plan.FocusProjector;
 import io.github.valsr.hafloorplan.plan.ManifestWriter;
 import io.github.valsr.hafloorplan.plan.RenderJob;
 
@@ -136,6 +140,7 @@ public final class Exporter {
 
         String floorId = null;
         Camera camera = null;
+        Map<String, FocusBox> computedFocus = new LinkedHashMap<String, FocusBox>();
         BufferedImage nightBase = null;
         try {
             for (int i = 0; i < jobs.size(); i++) {
@@ -155,6 +160,10 @@ public final class Exporter {
                         floorId = job.floorId;
                         scene.showFloor(floorId, this.config.isIsolateLevel(), this.config.isHideCeilings());
                         camera = scene.camera(getCameraId(floorId));
+                        FocusBox focus = computeFocus(clone, floorId, camera);
+                        if (focus != null) {
+                            computedFocus.put(floorId, focus);
+                        }
                     }
                     scene.setLights(job.lightId);
                     this.session = this.backend.open(clone, this.config.getRendererClassName(), this.config.getQuality(), this.config.getCapLight(), this.config.getExposure());
@@ -195,7 +204,7 @@ public final class Exporter {
             closeSession();
 
             String manifest = ManifestWriter.write(this.config, summary, plan, this.generator, nightTime,
-                    nightTime != null ? Double.valueOf(scene.sunElevation(nightTime)) : null);
+                    nightTime != null ? Double.valueOf(scene.sunElevation(nightTime)) : null, computedFocus);
             Files.write(manifestFile.toPath(), manifest.getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (IOException ex) {
@@ -225,6 +234,29 @@ public final class Exporter {
         if (session != null) {
             session.close();
         }
+    }
+
+    /**
+     * Returns the focus box of the floor <code>floorId</code> seen by <code>camera</code>, or <code>null</code>
+     * if the floor has a box set by hand, the lens isn't a perspective one, or no box can be computed.
+     */
+    private FocusBox computeFocus(Home home, String floorId, Camera camera) {
+        Camera.Lens lens = camera.getLens();
+        if (getFloor(floorId).focus != null || (lens != Camera.Lens.PINHOLE && lens != Camera.Lens.NORMAL)) {
+            return null;
+        }
+        return FocusProjector.project(camera.getX(), camera.getY(), camera.getZ(), camera.getYaw(), camera.getPitch(),
+                camera.getFieldOfView(), this.config.getWidth(), this.config.getHeight(),
+                HomeInspector.getWallCorners(home, floorId), this.config.getFocusMargin());
+    }
+
+    private ExportConfig.Floor getFloor(String floorId) {
+        for (ExportConfig.Floor floor : this.config.getFloors()) {
+            if (floor.levelId.equals(floorId)) {
+                return floor;
+            }
+        }
+        throw new IllegalArgumentException("No floor " + floorId);
     }
 
     private String getCameraId(String floorId) {
