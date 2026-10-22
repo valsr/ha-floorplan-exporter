@@ -39,6 +39,7 @@ public final class ExportConfig {
     private final boolean isolateLevel;
     private final LightCap capLight;
     private final double exposure;
+    private final double focusMargin;
     private final int noiseThreshold;
     private final File outputDir;
 
@@ -55,6 +56,7 @@ public final class ExportConfig {
         this.isolateLevel = builder.isolateLevel;
         this.capLight = builder.capLight;
         this.exposure = builder.exposure;
+        this.focusMargin = builder.focusMargin;
         this.noiseThreshold = builder.noiseThreshold;
         this.outputDir = builder.outputDir;
     }
@@ -114,6 +116,11 @@ public final class ExportConfig {
         return this.exposure;
     }
 
+    /** Returns the margin added around a computed focus box, in % of its width and height. */
+    public double getFocusMargin() {
+        return this.focusMargin;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -131,20 +138,29 @@ public final class ExportConfig {
         /** Id of a stored camera, or <code>null</code> for the current view of the home. */
         public final String cameraId;
 
+        /** The focus box set by hand, or <code>null</code> to compute it. */
+        public final FocusBox focus;
+
         public Floor(String levelId, String cameraId) {
+            this(levelId, cameraId, null);
+        }
+
+        public Floor(String levelId, String cameraId, FocusBox focus) {
             this.levelId = levelId;
             this.cameraId = cameraId;
+            this.focus = focus;
         }
 
         @Override
         public boolean equals(Object obj) {
             return obj instanceof Floor && this.levelId.equals(((Floor)obj).levelId)
-                    && Objects.equals(this.cameraId, ((Floor)obj).cameraId);
+                    && Objects.equals(this.cameraId, ((Floor)obj).cameraId)
+                    && Objects.equals(this.focus, ((Floor)obj).focus);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(this.levelId, this.cameraId);
+            return Objects.hash(this.levelId, this.cameraId, this.focus);
         }
     }
 
@@ -161,6 +177,7 @@ public final class ExportConfig {
         private boolean isolateLevel;
         private LightCap capLight = LightCap.OFF;
         private double exposure;
+        private double focusMargin = 5;
         private int noiseThreshold = 6;
         private File outputDir;
 
@@ -224,6 +241,11 @@ public final class ExportConfig {
 
         public Builder exposure(double exposure) {
             this.exposure = exposure;
+            return this;
+        }
+
+        public Builder focusMargin(double focusMargin) {
+            this.focusMargin = focusMargin;
             return this;
         }
 

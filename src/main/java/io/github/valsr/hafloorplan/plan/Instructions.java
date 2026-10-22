@@ -43,6 +43,7 @@ public final class Instructions {
     private final boolean isolateLevel;
     private final LightCap capLight;
     private final double exposure;
+    private final double focusMargin;
     private final int noiseThreshold;
 
     private Instructions(Builder builder) {
@@ -62,6 +63,7 @@ public final class Instructions {
         this.isolateLevel = builder.isolateLevel;
         this.capLight = builder.capLight;
         this.exposure = builder.exposure;
+        this.focusMargin = builder.focusMargin;
         this.noiseThreshold = builder.noiseThreshold;
     }
 
@@ -91,6 +93,7 @@ public final class Instructions {
         builder.isolateLevel = this.isolateLevel;
         builder.capLight = this.capLight;
         builder.exposure = this.exposure;
+        builder.focusMargin = this.focusMargin;
         builder.noiseThreshold = this.noiseThreshold;
         return builder;
     }
@@ -177,6 +180,11 @@ public final class Instructions {
         return this.exposure;
     }
 
+    /** Returns the margin added around a computed focus box, in % of its width and height. */
+    public double getFocusMargin() {
+        return this.focusMargin;
+    }
+
     public int getNoiseThreshold() {
         return this.noiseThreshold;
     }
@@ -195,6 +203,7 @@ public final class Instructions {
                 && Objects.equals(this.renderer, other.renderer) && this.quality == other.quality
                 && this.hideCeilings == other.hideCeilings && this.isolateLevel == other.isolateLevel
                 && this.capLight == other.capLight && this.exposure == other.exposure
+                && this.focusMargin == other.focusMargin
                 && this.noiseThreshold == other.noiseThreshold;
     }
 
@@ -217,23 +226,32 @@ public final class Instructions {
         /** The stored camera, or <code>null</code> for the current view of the home. */
         public final Ref camera;
 
+        /** The focus box set by hand, or <code>null</code> to compute it. */
+        public final FocusBox focus;
+
         public Floor(Ref level, Ref camera) {
+            this(level, camera, null);
+        }
+
+        public Floor(Ref level, Ref camera, FocusBox focus) {
             if (level == null) {
                 throw new IllegalArgumentException("A floor needs a level");
             }
             this.level = level;
             this.camera = camera;
+            this.focus = focus;
         }
 
         @Override
         public boolean equals(Object obj) {
             return obj instanceof Floor && this.level.equals(((Floor)obj).level)
-                    && Objects.equals(this.camera, ((Floor)obj).camera);
+                    && Objects.equals(this.camera, ((Floor)obj).camera)
+                    && Objects.equals(this.focus, ((Floor)obj).focus);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(this.level, this.camera);
+            return Objects.hash(this.level, this.camera, this.focus);
         }
     }
 
@@ -254,6 +272,7 @@ public final class Instructions {
         private boolean isolateLevel;
         private LightCap capLight = LightCap.OFF;
         private double exposure;
+        private double focusMargin = 5;
         private int noiseThreshold = 6;
 
         private Builder() {
@@ -340,6 +359,11 @@ public final class Instructions {
 
         public Builder exposure(double exposure) {
             this.exposure = exposure;
+            return this;
+        }
+
+        public Builder focusMargin(double focusMargin) {
+            this.focusMargin = focusMargin;
             return this;
         }
 

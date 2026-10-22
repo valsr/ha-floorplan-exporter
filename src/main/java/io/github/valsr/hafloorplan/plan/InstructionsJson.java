@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +34,10 @@ import java.util.Map;
 public final class InstructionsJson {
     private static final int VERSION = 1;
     private static final List<String> KEYS = Arrays.asList("version", "home", "output", "floors", "dates", "times",
-            "lights", "width", "height", "renderer", "quality", "hideCeilings", "isolateLevel", "capLight", "exposure", "noiseThreshold");
+            "lights", "width", "height", "renderer", "quality", "hideCeilings", "isolateLevel", "capLight", "exposure", "focusMargin",
+            "noiseThreshold");
     private static final double MAX_EXPOSURE = 10;
+    private static final double MAX_FOCUS_MARGIN = 50;
     private static final String ALL = "*";
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -119,6 +122,14 @@ public final class InstructionsJson {
                         + " to " + (int)MAX_EXPOSURE);
             }
         }
+        if (object.containsKey("focusMargin")) {
+            Object focusMargin = object.get("focusMargin");
+            if (focusMargin instanceof Double && (Double)focusMargin >= 0 && (Double)focusMargin <= MAX_FOCUS_MARGIN) {
+                builder.focusMargin((Double)focusMargin);
+            } else {
+                this.problems.add("\"focusMargin\" must be a number from 0 to " + (int)MAX_FOCUS_MARGIN);
+            }
+        }
         Integer noiseThreshold = readInteger(object, "noiseThreshold", 6, 0, 255);
 
         if (!this.problems.isEmpty()) {
@@ -195,7 +206,7 @@ public final class InstructionsJson {
                 }
                 Map<String, Object> floor = (Map<String, Object>)item;
                 for (String key : floor.keySet()) {
-                    if (!key.equals("level") && !key.equals("camera")) {
+                    if (!key.equals("level") && !key.equals("camera") && !key.equals("focus")) {
                         this.problems.add("Unknown key \"" + key + "\" in " + label);
                     }
                 }
@@ -206,8 +217,9 @@ public final class InstructionsJson {
                     this.problems.add(label + " needs a \"level\"");
                 }
                 Ref camera = floor.containsKey("camera") ? readRef(floor.get("camera"), label + ".camera") : null;
+                FocusBox focus = floor.containsKey("focus") ? readFocus(floor.get("focus"), label + ".focus") : null;
                 if (level != null) {
-                    floors.add(new Instructions.Floor(level, camera));
+                    floors.add(new Instructions.Floor(level, camera, focus));
                 }
             }
             builder.floors(floors);
@@ -231,6 +243,43 @@ public final class InstructionsJson {
             }
             builder.lights(lights);
         }
+    }
+
+    /** Reads a focus box written as <code>{"x": [left, right], "y": [top, bottom]}</code>. */
+    @SuppressWarnings("unchecked")
+    private FocusBox readFocus(Object value, String label) {
+        String expected = label + " must be {\"x\": [left, right], \"y\": [top, bottom]} in whole pixels,"
+                + " with left < right and top < bottom";
+        if (!(value instanceof Map) || !((Map<String, Object>)value).keySet().equals(new HashSet<String>(Arrays.asList("x", "y")))) {
+            this.problems.add(expected);
+            return null;
+        }
+        Map<String, Object> box = (Map<String, Object>)value;
+        int [] x = readPair(box.get("x"));
+        int [] y = readPair(box.get("y"));
+        if (x == null || y == null || x [0] >= x [1] || y [0] >= y [1]) {
+            this.problems.add(expected);
+            return null;
+        }
+        return new FocusBox(x [0], y [0], x [1], y [1]);
+    }
+
+    /** Returns the two non-negative whole numbers of a JSON array, or <code>null</code>. */
+    @SuppressWarnings("unchecked")
+    private static int [] readPair(Object value) {
+        if (!(value instanceof List) || ((List<Object>)value).size() != 2) {
+            return null;
+        }
+        int [] pair = new int [2];
+        for (int i = 0; i < 2; i++) {
+            Object number = ((List<Object>)value).get(i);
+            if (!(number instanceof Double) || (Double)number != Math.rint((Double)number)
+                    || (Double)number < 0 || (Double)number > Integer.MAX_VALUE) {
+                return null;
+            }
+            pair [i] = (int)(double)(Double)number;
+        }
+        return pair;
     }
 
     @SuppressWarnings("unchecked")
@@ -322,6 +371,12 @@ public final class InstructionsJson {
                 if (floor.camera != null) {
                     floorObject.put("camera", refValue(floor.camera));
                 }
+                if (floor.focus != null) {
+                    Map<String, Object> focus = new LinkedHashMap<String, Object>();
+                    focus.put("x", Arrays.<Object>asList(floor.focus.left, floor.focus.right));
+                    focus.put("y", Arrays.<Object>asList(floor.focus.top, floor.focus.bottom));
+                    floorObject.put("focus", focus);
+                }
                 floors.add(floorObject);
             }
             object.put("floors", floors);
@@ -355,6 +410,7 @@ public final class InstructionsJson {
         object.put("isolateLevel", instructions.isIsolateLevel());
         object.put("capLight", instructions.getCapLight().toText());
         object.put("exposure", instructions.getExposure());
+        object.put("focusMargin", instructions.getFocusMargin());
         object.put("noiseThreshold", instructions.getNoiseThreshold());
         return Json.write(object);
     }
