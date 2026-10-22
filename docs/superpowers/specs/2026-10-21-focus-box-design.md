@@ -1,7 +1,7 @@
 # Focus box — Design
 
 Date: 2026-10-21
-Status: approved design, not implemented.
+Status: implemented.
 Builds on: `2026-10-07-ha-floorplan-exporter-design.md` (referred to below as "the main spec").
 
 ## 1. Purpose
