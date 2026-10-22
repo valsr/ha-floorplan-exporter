@@ -20,16 +20,110 @@ package io.github.valsr.hafloorplan.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
 
 import com.eteks.sweethome3d.model.Camera;
 import com.eteks.sweethome3d.model.Home;
 import com.eteks.sweethome3d.model.HomeLight;
+import com.eteks.sweethome3d.model.Level;
+import com.eteks.sweethome3d.model.Wall;
 
 import io.github.valsr.hafloorplan.plan.HomeSummary;
 
 class HomeInspectorTest {
+    /** Returns the distinct values of coordinate <code>index</code> of the corners. */
+    private static Set<Double> values(List<double []> corners, int index) {
+        Set<Double> values = new TreeSet<Double>();
+        for (double [] corner : corners) {
+            values.add(corner [index]);
+        }
+        return values;
+    }
+
+    private static Set<Double> set(double ... values) {
+        Set<Double> set = new TreeSet<Double>();
+        for (double value : values) {
+            set.add(value);
+        }
+        return set;
+    }
+
+    private static Wall wall(Home home, Level level, Float height) {
+        Wall wall = new Wall(0, 0, 400, 0, 20, 0);
+        // addWall puts the wall at the selected level
+        home.addWall(wall);
+        wall.setLevel(level);
+        wall.setHeight(height);
+        return wall;
+    }
+
+    private static Level level(Home home, String name, float elevation) {
+        Level level = new Level(name, elevation, 12, 250);
+        home.addLevel(level);
+        return level;
+    }
+
+    @Test
+    void wallCornersOfRaisedLevel() {
+        Home home = new Home();
+        Level level = level(home, "First floor", 300);
+        wall(home, level, 250f);
+
+        List<double []> corners = HomeInspector.getWallCorners(home, level.getId());
+
+        assertEquals(8, corners.size());
+        assertEquals(set(0, 400), values(corners, 0));
+        assertEquals(set(-10, 10), values(corners, 1));
+        assertEquals(set(300, 550), values(corners, 2));
+    }
+
+    @Test
+    void wallCornersUseHomeWallHeight() {
+        Home home = new Home(260);
+        Level level = level(home, "First floor", 300);
+        wall(home, level, null);
+
+        assertEquals(set(300, 560), values(HomeInspector.getWallCorners(home, level.getId()), 2));
+    }
+
+    @Test
+    void slopedWallUsesHigherEnd() {
+        Home home = new Home();
+        Level level = level(home, "First floor", 300);
+        wall(home, level, 250f).setHeightAtEnd(300f);
+
+        assertEquals(set(300, 600), values(HomeInspector.getWallCorners(home, level.getId()), 2));
+    }
+
+    @Test
+    void otherLevelsLeftOut() {
+        Home home = new Home();
+        Level ground = level(home, "Ground floor", 0);
+        Level first = level(home, "First floor", 262);
+        wall(home, ground, 250f);
+
+        assertTrue(HomeInspector.getWallCorners(home, first.getId()).isEmpty());
+        assertEquals(8, HomeInspector.getWallCorners(home, ground.getId()).size());
+    }
+
+    @Test
+    void homeWithoutLevels() {
+        Home home = new Home();
+        wall(home, null, 250f);
+        Wall other = new Wall(0, 0, 0, 300, 10, 250f);
+        home.addWall(other);
+
+        List<double []> corners = HomeInspector.getWallCorners(home, HomeSummary.DEFAULT_FLOOR_ID);
+
+        assertEquals(16, corners.size());
+        assertEquals(set(0, 250), values(corners, 2));
+    }
     private static HomeSummary.Light lightNamed(HomeSummary summary, String name) {
         for (HomeSummary.Light light : summary.getLights()) {
             if (name.equals(light.name)) {
