@@ -106,11 +106,13 @@ don't change that order.
 `HomeInspector.getWallCorners(Home home, String floorId)` returns the corners as a list of
 `double[] {x, y, elevation}` in centimetres, Sweet Home 3D plan coordinates:
 
-- Walls: those whose level is the floor `floorId`; in a home without levels
-  (`HomeSummary.DEFAULT_FLOOR_ID`), every wall, at elevation 0.
+- Walls: those Sweet Home 3D shows at the floor `floorId` (`wall.isAtLevel(floor)`): its own walls and
+  the walls of a lower level rising through it, like an outer wall drawn once for two storeys. A wall
+  from a lower level starts at the floor's elevation, so the storeys under it don't widen the box. In a
+  home without levels (`HomeSummary.DEFAULT_FLOOR_ID`), every wall, at elevation 0.
 - Outline: `wall.getPoints()`, which includes the thickness and approximates an arc wall.
-- Each outline point gives a bottom corner at the level's elevation and a top corner at that
-  elevation plus the wall height: `wall.getHeight()`, or `home.getWallHeight()` when it's `null`.
+- Each outline point gives a bottom corner (above) and a top corner at the elevation of the wall's own
+  level plus the wall height: `wall.getHeight()`, or `home.getWallHeight()` when it's `null`.
   A sloping wall (`getHeightAtEnd()` not `null`) uses the larger of its two heights for all of its
   top corners, which can only make the box larger.
 

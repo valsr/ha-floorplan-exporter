@@ -113,6 +113,21 @@ class HomeInspectorTest {
     }
 
     @Test
+    void wallRisingFromALowerLevelCountsFromTheFloor() {
+        Home home = new Home();
+        Level ground = level(home, "Ground floor", 0);
+        Level first = level(home, "First floor", 262);
+        // An outer wall drawn once on the ground floor, two storeys high, and a ground floor wall under the first one
+        wall(home, ground, 600f);
+        wall(home, ground, 250f);
+
+        List<double []> corners = HomeInspector.getWallCorners(home, first.getId());
+
+        assertEquals(8, corners.size());
+        assertEquals(set(262, 600), values(corners, 2));
+    }
+
+    @Test
     void homeWithoutLevels() {
         Home home = new Home();
         wall(home, null, 250f);
